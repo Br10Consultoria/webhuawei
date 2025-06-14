@@ -1,0 +1,418 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-6">
+    <!-- Header Section -->
+    <div class="text-center mb-8">
+        <h1 class="text-4xl font-bold text-gray-900 mb-4">Network Monitoring Dashboard</h1>
+        <p class="text-xl text-gray-600">Monitor and manage your NE8000 router in real-time</p>
+    </div>
+
+    <!-- Metrics Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <!-- CPU Usage -->
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-600">CPU Usage</p>
+                    <p class="text-2xl font-bold text-gray-900" id="cpuUsage">--</p>
+                </div>
+                <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <span class="text-2xl">🖥️</span>
+                </div>
+            </div>
+            <div class="mt-4">
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" id="cpuProgress" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Memory Usage -->
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-600">Memory Usage</p>
+                    <p class="text-2xl font-bold text-gray-900" id="memoryUsage">--</p>
+                </div>
+                <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                    <span class="text-2xl">💾</span>
+                </div>
+            </div>
+            <div class="mt-4">
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="bg-green-600 h-2 rounded-full transition-all duration-300" id="memoryProgress" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PPPoE Online -->
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-600">PPPoE Online</p>
+                    <p class="text-2xl font-bold text-gray-900" id="pppoeOnline">--</p>
+                </div>
+                <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                    <span class="text-2xl">👥</span>
+                </div>
+            </div>
+            <div class="mt-4">
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="bg-purple-600 h-2 rounded-full transition-all duration-300" id="pppoeProgress" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Network Traffic -->
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-600">Network Traffic</p>
+                    <p class="text-2xl font-bold text-gray-900" id="networkTraffic">--</p>
+                </div>
+                <div class="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                    <span class="text-2xl">📊</span>
+                </div>
+            </div>
+            <div class="mt-4">
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="bg-orange-600 h-2 rounded-full transition-all duration-300" id="trafficProgress" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Section -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <!-- System Chart -->
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">System Performance</h3>
+            <canvas id="systemChart" width="400" height="200"></canvas>
+        </div>
+
+        <!-- PPPoE Sessions Chart -->
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">PPPoE Sessions</h3>
+            <canvas id="pppoeChart" width="400" height="200"></canvas>
+        </div>
+    </div>
+
+    <!-- Network Traffic Chart -->
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mb-8">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Network Traffic</h3>
+        <canvas id="trafficChart" width="800" height="300"></canvas>
+    </div>
+
+    <!-- Network Interfaces Grid -->
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mb-8">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Network Interfaces</h3>
+        <div id="interfacesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <!-- Interfaces will be loaded here -->
+        </div>
+    </div>
+
+    <!-- System Information and Quick Actions -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- System Information -->
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">System Information</h3>
+            <div class="space-y-3">
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Model:</span>
+                    <span class="font-medium" id="systemModel">--</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Version:</span>
+                    <span class="font-medium" id="systemVersion">--</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Serial:</span>
+                    <span class="font-medium" id="systemSerial">--</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Uptime:</span>
+                    <span class="font-medium" id="systemUptime">--</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Temperature:</span>
+                    <span class="font-medium" id="systemTemp">--</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Power Status:</span>
+                    <span class="font-medium" id="powerStatus">--</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">Quick Actions</h3>
+            <div class="grid grid-cols-2 gap-3">
+                <a href="{{ url_for('pppoe.pppoe_management') }}" 
+                   class="bg-blue-50 hover:bg-blue-100 p-4 rounded-lg border border-blue-200 transition-colors text-center">
+                    <div class="text-2xl mb-2">🔍</div>
+                    <div class="text-sm font-medium text-blue-800">PPPoE Query</div>
+                </a>
+                
+                <a href="{{ url_for('interface.interfaces') }}" 
+                   class="bg-green-50 hover:bg-green-100 p-4 rounded-lg border border-green-200 transition-colors text-center">
+                    <div class="text-2xl mb-2">🔧</div>
+                    <div class="text-sm font-medium text-green-800">Interfaces</div>
+                </a>
+                
+                <a href="{{ url_for('terminal.terminal') }}" 
+                   class="bg-purple-50 hover:bg-purple-100 p-4 rounded-lg border border-purple-200 transition-colors text-center">
+                    <div class="text-2xl mb-2">💻</div>
+                    <div class="text-sm font-medium text-purple-800">Terminal</div>
+                </a>
+                
+                <a href="{{ url_for('logs.logs') }}" 
+                   class="bg-orange-50 hover:bg-orange-100 p-4 rounded-lg border border-orange-200 transition-colors text-center">
+                    <div class="text-2xl mb-2">📋</div>
+                    <div class="text-sm font-medium text-orange-800">Logs</div>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Global variables for charts
+let systemChart, pppoeChart, trafficChart;
+
+// Initialize dashboard
+document.addEventListener('DOMContentLoaded', function() {
+    initializeCharts();
+    loadDashboardData();
+    
+    // Auto-refresh every 30 seconds
+    setInterval(loadDashboardData, 30000);
+});
+
+// Initialize all charts
+function initializeCharts() {
+    // System Performance Chart
+    const systemCtx = document.getElementById('systemChart').getContext('2d');
+    systemChart = new Chart(systemCtx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'CPU %',
+                data: [],
+                borderColor: 'rgb(59, 130, 246)',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                tension: 0.4
+            }, {
+                label: 'Memory %',
+                data: [],
+                borderColor: 'rgb(16, 185, 129)',
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100
+                }
+            }
+        }
+    });
+
+    // PPPoE Sessions Chart
+    const pppoeCtx = document.getElementById('pppoeChart').getContext('2d');
+    pppoeChart = new Chart(pppoeCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Online', 'Available'],
+            datasets: [{
+                data: [0, 0], // Will be updated with real data from API
+                backgroundColor: ['rgb(147, 51, 234)', 'rgb(229, 231, 235)']
+            }]
+        },
+        options: {
+            responsive: true
+        }
+    });
+
+    // Network Traffic Chart
+    const trafficCtx = document.getElementById('trafficChart').getContext('2d');
+    trafficChart = new Chart(trafficCtx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Inbound (Mbps)',
+                data: [],
+                borderColor: 'rgb(245, 158, 11)',
+                backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                tension: 0.4
+            }, {
+                label: 'Outbound (Mbps)',
+                data: [],
+                borderColor: 'rgb(239, 68, 68)',
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+
+// Load all dashboard data
+async function loadDashboardData() {
+    try {
+        // Load system metrics
+        const systemResponse = await fetch('/api/system_metrics');
+        const systemData = await systemResponse.json();
+        updateSystemMetrics(systemData);
+
+        // Load PPPoE stats
+        const pppoeResponse = await fetch('/api/pppoe_stats');
+        const pppoeData = await pppoeResponse.json();
+        updatePPPoEStats(pppoeData);
+
+        // Load network traffic
+        const trafficResponse = await fetch('/api/network_traffic');
+        const trafficData = await trafficResponse.json();
+        updateNetworkTraffic(trafficData);
+
+        // Load interfaces
+        const interfacesResponse = await fetch('/api/interfaces_status');
+        const interfacesData = await interfacesResponse.json();
+        updateInterfaces(interfacesData);
+
+    } catch (error) {
+        console.error('Error loading dashboard data:', error);
+    }
+}
+
+// Update system metrics
+function updateSystemMetrics(data) {
+    const cpu = data.cpu || 0;
+    const memory = data.memory || 0;
+    
+    document.getElementById('cpuUsage').textContent = cpu + '%';
+    document.getElementById('cpuProgress').style.width = cpu + '%';
+    
+    document.getElementById('memoryUsage').textContent = memory + '%';
+    document.getElementById('memoryProgress').style.width = memory + '%';
+    
+    document.getElementById('systemModel').textContent = data.model || '--';
+    document.getElementById('systemVersion').textContent = data.version || '--';
+    document.getElementById('systemSerial').textContent = data.serial || '--';
+    document.getElementById('systemUptime').textContent = data.uptime || '--';
+    document.getElementById('systemTemp').textContent = data.temperature ? data.temperature + '°C' : '--';
+    document.getElementById('powerStatus').textContent = data.power_status || '--';
+
+    // Update system chart
+    const now = new Date().toLocaleTimeString();
+    systemChart.data.labels.push(now);
+    systemChart.data.datasets[0].data.push(cpu);
+    systemChart.data.datasets[1].data.push(memory);
+    
+    // Keep only last 10 data points
+    if (systemChart.data.labels.length > 10) {
+        systemChart.data.labels.shift();
+        systemChart.data.datasets[0].data.shift();
+        systemChart.data.datasets[1].data.shift();
+    }
+    
+    systemChart.update();
+}
+
+// Update PPPoE statistics
+function updatePPPoEStats(data) {
+    document.getElementById('pppoeOnline').textContent = data.total || '0';
+    const maxUsers = data.max_users || 100; // Use real max from API data
+    const percentage = data.total && data.max_users ? Math.min((data.total / data.max_users) * 100, 100) : 0;
+    document.getElementById('pppoeProgress').style.width = percentage + '%';
+    
+    // Update PPPoE chart
+    const available = data.max_users ? Math.max((data.max_users - (data.total || 0)), 0) : 0;
+    pppoeChart.data.datasets[0].data = [data.total || 0, available];
+    pppoeChart.update();
+}
+
+// Update network traffic
+function updateNetworkTraffic(data) {
+    const inbound = data.inbound || 0;
+    const outbound = data.outbound || 0;
+    const total = inbound + outbound;
+    document.getElementById('networkTraffic').textContent = total.toFixed(1) + ' Mbps';
+    const maxBandwidth = data.max_bandwidth || 100; // Use real max from API data
+    const percentage = data.max_bandwidth && total ? Math.min((total / data.max_bandwidth) * 100, 100) : 0;
+    document.getElementById('trafficProgress').style.width = percentage + '%';
+    
+    // Update traffic chart
+    const now = new Date().toLocaleTimeString();
+    trafficChart.data.labels.push(now);
+    trafficChart.data.datasets[0].data.push(inbound);
+    trafficChart.data.datasets[1].data.push(outbound);
+    
+    // Keep only last 20 data points
+    if (trafficChart.data.labels.length > 20) {
+        trafficChart.data.labels.shift();
+        trafficChart.data.datasets[0].data.shift();
+        trafficChart.data.datasets[1].data.shift();
+    }
+    
+    trafficChart.update();
+}
+
+// Update interfaces grid
+function updateInterfaces(response) {
+    const grid = document.getElementById('interfacesGrid');
+    
+    // Verificar se response é válido
+    if (!response || !response.success) {
+        grid.innerHTML = `
+            <div class="col-span-full text-center py-6">
+                <div class="text-red-400 text-base mb-2">❌ Erro ao carregar interfaces</div>
+                <div class="text-gray-500 text-sm">${response?.error || 'Erro desconhecido'}</div>
+            </div>
+        `;
+        return;
+    }
+    
+    // Garantir que interfaces é um array
+    const interfaces = Array.isArray(response.data) ? response.data : [];
+    
+    if (interfaces.length === 0) {
+        grid.innerHTML = `
+            <div class="col-span-full text-center py-6">
+                <div class="text-gray-400 text-base mb-2">📡 Nenhuma interface disponível</div>
+                <div class="text-gray-500 text-sm">Router offline ou sem dados válidos</div>
+            </div>
+        `;
+        return;
+    }
+    
+    // Agora podemos usar .map com segurança
+    grid.innerHTML = interfaces.map(iface => `
+        <div class="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:border-blue-300 transition-colors">
+            <div class="flex items-center justify-between mb-2">
+                <span class="font-medium text-gray-800">${iface.name || 'N/A'}</span>
+                <span class="inline-block w-3 h-3 rounded-full ${(iface.status === 'up') ? 'bg-green-500' : 'bg-red-500'}"></span>
+            </div>
+            <div class="text-sm text-gray-600">
+                <div>Status: <span class="${(iface.status === 'up') ? 'text-green-600' : 'text-red-600'}">${iface.status || 'unknown'}</span></div>
+                <div>In: ${iface.in_util || '0%'}</div>
+                <div>Out: ${iface.out_util || '0%'}</div>
+            </div>
+        </div>
+    `).join('');
+}
+</script>
+{% endblock %} 

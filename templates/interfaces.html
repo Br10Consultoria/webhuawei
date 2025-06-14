@@ -1,0 +1,364 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-6">
+    <!-- Interface Management Dashboard -->
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-semibold text-gray-800">Interface Management</h2>
+            <button onclick="refreshInterfaces()" 
+                    class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                🔄 Refresh
+            </button>
+        </div>
+
+        <!-- Interface Control Panel -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <!-- Interface Query -->
+            <div class="bg-gray-50 rounded-lg p-4">
+                <h3 class="text-lg font-medium text-gray-800 mb-4">Query Interface</h3>
+                <div class="space-y-3">
+                    <input type="text" 
+                           id="queryInterface" 
+                           placeholder="Enter interface name (e.g. GE0/0/1)" 
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
+                    <button onclick="queryInterface()" 
+                            class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                        🔍 Query Interface
+                    </button>
+                </div>
+            </div>
+
+            <!-- Interface Control -->
+            <div class="bg-gray-50 rounded-lg p-4">
+                <h3 class="text-lg font-medium text-gray-800 mb-4">Interface Control</h3>
+                <div class="space-y-3">
+                    <select id="controlInterface" 
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
+                        <option value="">Select interface to control...</option>
+                    </select>
+                    <div class="flex space-x-2">
+                        <button onclick="activateInterface()" 
+                                class="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors">
+                            ✅ Activate
+                        </button>
+                        <button onclick="deactivateInterface()" 
+                                class="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors">
+                            ❌ Deactivate
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Interface List -->
+        <div class="bg-gray-50 rounded-lg p-4">
+            <h3 class="text-lg font-medium text-gray-800 mb-4">Available Interfaces</h3>
+            <div id="interfacesList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                <!-- Interfaces will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Command Output -->
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-semibold text-gray-800">Command Output</h2>
+            <button onclick="clearOutput()" 
+                    class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors text-sm">
+                Clear
+            </button>
+        </div>
+        <div id="commandOutput" class="bg-gray-900 rounded-lg p-4 font-mono text-sm min-h-[200px] max-h-[400px] overflow-y-auto">
+            <p class="text-gray-400">Ready to execute commands...</p>
+        </div>
+    </div>
+
+    <!-- Action Log -->
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <h2 class="text-xl font-semibold text-gray-800 mb-4">Action Log</h2>
+        <div id="actionLog" class="space-y-2 max-h-[300px] overflow-y-auto">
+            <!-- Action logs will appear here -->
+        </div>
+    </div>
+</div>
+
+<script>
+let interfaces = [];
+
+// Initialize page
+document.addEventListener('DOMContentLoaded', function() {
+    loadInterfaces();
+    addLogEntry('System', 'Interface management page loaded', 'info');
+});
+
+// Load available interfaces
+async function loadInterfaces() {
+    try {
+        const response = await fetch('/api/interfaces_status');
+        const data = await response.json();
+        
+        interfaces = data;
+        updateInterfacesList();
+        updateControlSelect();
+        
+        addLogEntry('System', `Loaded ${interfaces.length} interfaces`, 'success');
+    } catch (error) {
+        console.error('Error loading interfaces:', error);
+        addLogEntry('System', 'Failed to load interfaces: ' + error.message, 'error');
+    }
+}
+
+// Update interfaces list display
+function updateInterfacesList() {
+    const container = document.getElementById('interfacesList');
+    
+    if (interfaces.length === 0) {
+        container.innerHTML = `
+            <div class="col-span-full text-center py-8">
+                <div class="text-gray-400 text-lg mb-2">📡 Nenhuma interface disponível</div>
+                <div class="text-gray-500 text-sm">
+                    <p>Possíveis causas:</p>
+                    <ul class="mt-2 space-y-1">
+                        <li>• Router não conectado</li>
+                        <li>• Falha na comunicação SSH/Telnet</li>
+                        <li>• Credenciais inválidas</li>
+                        <li>• Router não responde aos comandos</li>
+                    </ul>
+                    <p class="mt-3 text-blue-600">Clique em "Refresh" para tentar novamente</p>
+                </div>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = interfaces.map(iface => `
+        <div class="bg-white rounded-lg p-3 border border-gray-200 hover:border-blue-300 transition-colors">
+            <div class="flex justify-between items-center">
+                <div>
+                    <div class="font-medium text-gray-800">${iface.name}</div>
+                    <div class="text-sm text-gray-500">
+                        Status: <span class="inline-block w-2 h-2 rounded-full ${iface.status === 'up' ? 'bg-green-500' : 'bg-red-500'}"></span>
+                        <span class="${iface.status === 'up' ? 'text-green-600' : 'text-red-600'}">${iface.status}</span>
+                    </div>
+                </div>
+                <div class="text-xs text-gray-400">
+                    <div>In: ${iface.in_util || '0%'}</div>
+                    <div>Out: ${iface.out_util || '0%'}</div>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Update control select options
+function updateControlSelect() {
+    const select = document.getElementById('controlInterface');
+    select.innerHTML = '<option value="">Select interface to control...</option>';
+    
+    interfaces.forEach(iface => {
+        const option = document.createElement('option');
+        option.value = iface.name;
+        option.textContent = `${iface.name} (${iface.status})`;
+        select.appendChild(option);
+    });
+}
+
+// Query specific interface
+async function queryInterface() {
+    const interfaceName = document.getElementById('queryInterface').value.trim();
+    
+    if (!interfaceName) {
+        alert('Please enter an interface name');
+        return;
+    }
+    
+    addLogEntry('Query', `Querying interface: ${interfaceName}`, 'info');
+    
+    try {
+        const response = await fetch('/api/interface_command', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                command: `display interface ${interfaceName}`,
+                action: 'query',
+                interface: interfaceName
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            displayOutput(data.output);
+            addLogEntry('Query', `Successfully queried ${interfaceName}`, 'success');
+        } else {
+            displayOutput(`Error: ${data.error}`);
+            addLogEntry('Query', `Failed to query ${interfaceName}: ${data.error}`, 'error');
+        }
+    } catch (error) {
+        displayOutput(`Error: ${error.message}`);
+        addLogEntry('Query', `Query failed: ${error.message}`, 'error');
+    }
+}
+
+// Activate interface
+async function activateInterface() {
+    const interfaceName = document.getElementById('controlInterface').value;
+    
+    if (!interfaceName) {
+        alert('Please select an interface to activate');
+        return;
+    }
+    
+    if (!confirm(`Are you sure you want to ACTIVATE interface ${interfaceName}?`)) {
+        return;
+    }
+    
+    addLogEntry('Control', `Activating interface: ${interfaceName}`, 'info');
+    
+    try {
+        const response = await fetch('/api/interface_command', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                command: `interface ${interfaceName}\nundo shutdown\nquit`,
+                action: 'activate',
+                interface: interfaceName
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            displayOutput(data.output);
+            addLogEntry('Control', `✅ Successfully activated ${interfaceName}`, 'success');
+            // Refresh interfaces after 2 seconds
+            setTimeout(refreshInterfaces, 2000);
+        } else {
+            displayOutput(`Error: ${data.error}`);
+            addLogEntry('Control', `❌ Failed to activate ${interfaceName}: ${data.error}`, 'error');
+        }
+    } catch (error) {
+        displayOutput(`Error: ${error.message}`);
+        addLogEntry('Control', `❌ Activation failed: ${error.message}`, 'error');
+    }
+}
+
+// Deactivate interface
+async function deactivateInterface() {
+    const interfaceName = document.getElementById('controlInterface').value;
+    
+    if (!interfaceName) {
+        alert('Please select an interface to deactivate');
+        return;
+    }
+    
+    if (!confirm(`⚠️ WARNING: Are you sure you want to DEACTIVATE interface ${interfaceName}?\n\nThis will shut down the interface and may cause network disruption!`)) {
+        return;
+    }
+    
+    addLogEntry('Control', `Deactivating interface: ${interfaceName}`, 'warning');
+    
+    try {
+        const response = await fetch('/api/interface_command', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                command: `interface ${interfaceName}\nshutdown\nquit`,
+                action: 'deactivate',
+                interface: interfaceName
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            displayOutput(data.output);
+            addLogEntry('Control', `❌ Successfully deactivated ${interfaceName}`, 'warning');
+            // Refresh interfaces after 2 seconds
+            setTimeout(refreshInterfaces, 2000);
+        } else {
+            displayOutput(`Error: ${data.error}`);
+            addLogEntry('Control', `❌ Failed to deactivate ${interfaceName}: ${data.error}`, 'error');
+        }
+    } catch (error) {
+        displayOutput(`Error: ${error.message}`);
+        addLogEntry('Control', `❌ Deactivation failed: ${error.message}`, 'error');
+    }
+}
+
+// Refresh interfaces
+async function refreshInterfaces() {
+    addLogEntry('System', 'Refreshing interfaces...', 'info');
+    await loadInterfaces();
+}
+
+// Display command output
+function displayOutput(output) {
+    const container = document.getElementById('commandOutput');
+    const timestamp = new Date().toLocaleTimeString();
+    
+    container.innerHTML = `
+        <div class="text-gray-400 text-xs mb-2">[${timestamp}] Command executed:</div>
+        <pre class="whitespace-pre-wrap text-green-400">${output}</pre>
+    `;
+    
+    // Auto-scroll to bottom
+    container.scrollTop = container.scrollHeight;
+}
+
+// Clear output
+function clearOutput() {
+    document.getElementById('commandOutput').innerHTML = '<p class="text-gray-400">Ready to execute commands...</p>';
+    addLogEntry('System', 'Output cleared', 'info');
+}
+
+// Add log entry
+function addLogEntry(category, message, type = 'info') {
+    const container = document.getElementById('actionLog');
+    const timestamp = new Date().toLocaleString();
+    
+    const typeColors = {
+        'info': 'bg-blue-100 text-blue-800 border-blue-200',
+        'success': 'bg-green-100 text-green-800 border-green-200',
+        'warning': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+        'error': 'bg-red-100 text-red-800 border-red-200'
+    };
+    
+    const typeIcons = {
+        'info': 'ℹ️',
+        'success': '✅',
+        'warning': '⚠️',
+        'error': '❌'
+    };
+    
+    const logEntry = document.createElement('div');
+    logEntry.className = `p-3 rounded-lg border ${typeColors[type] || typeColors.info}`;
+    logEntry.innerHTML = `
+        <div class="flex justify-between items-start">
+            <div class="flex-1">
+                <div class="flex items-center space-x-2">
+                    <span>${typeIcons[type] || typeIcons.info}</span>
+                    <span class="font-medium">${category}</span>
+                    <span class="text-xs opacity-75">${timestamp}</span>
+                </div>
+                <div class="mt-1 text-sm">${message}</div>
+            </div>
+        </div>
+    `;
+    
+    container.insertBefore(logEntry, container.firstChild);
+    
+    // Keep only last 50 entries
+    while (container.children.length > 50) {
+        container.removeChild(container.lastChild);
+    }
+}
+</script>
+{% endblock %}

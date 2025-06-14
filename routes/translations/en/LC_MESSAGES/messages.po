@@ -1,0 +1,28 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: en\n"
+
+msgid "Home"
+msgstr "Home"
+
+msgid "History"
+msgstr "History"
+
+msgid "Terminal"
+msgstr "Terminal"
+
+msgid "Logout"
+msgstr "Logout"
+
+msgid "Login successful"
+msgstr "Login successful"
+
+msgid "Invalid credentials"
+msgstr "Invalid credentials"
+
+msgid "Logged out successfully"
+msgstr "Logged out successfully"
+
+# ... adicione mais traduções conforme necessário 

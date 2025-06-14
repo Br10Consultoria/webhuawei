@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-8">
+    <!-- Status do Background Service -->
+    <div class="bg-blue-50 border-l-4 border-blue-400 p-4 rounded-lg">
+        <div class="flex items-center">
+            <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                </svg>
+            </div>
+            <div class="ml-3">
+                <p class="text-sm text-blue-700">
+                    <span id="service-status">Verificando status do serviço...</span>
+                    <button onclick="forceRefresh()" class="ml-4 text-blue-600 hover:text-blue-800 underline">
+                        Forçar Atualização
+                    </button>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <div class="flex flex-col items-center">
+                <h3 class="text-lg font-medium text-gray-600">Total Online Users</h3>
+                <p id="total-users" class="text-4xl font-bold text-blue-600 mt-2">-</p>
+                <p id="total-updated" class="text-sm text-gray-500 mt-2">Carregando...</p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <div class="flex flex-col items-center">
+                <h3 class="text-lg font-medium text-gray-600">Active Sessions</h3>
+                <p id="active-sessions" class="text-4xl font-bold text-green-600 mt-2">-</p>
+                <p id="active-updated" class="text-sm text-gray-500 mt-2">Carregando...</p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <div class="flex flex-col items-center">
+                <h3 class="text-lg font-medium text-gray-600">Peak Users</h3>
+                <p id="peak-users" class="text-4xl font-bold text-purple-600 mt-2">-</p>
+                <p id="peak-updated" class="text-sm text-gray-500 mt-2">Carregando...</p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <div class="flex flex-col items-center">
+                <h3 class="text-lg font-medium text-gray-600">Sistema</h3>
+                <div class="mt-2 text-center">
+                    <p class="text-lg font-semibold text-gray-700">CPU: <span id="cpu-usage">-%</span></p>
+                    <p class="text-lg font-semibold text-gray-700">RAM: <span id="ram-usage">-%</span></p>
+                </div>
+                <p id="system-updated" class="text-sm text-gray-500 mt-2">Carregando...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Terminal Output -->
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <h2 class="text-xl font-semibold text-gray-800 mb-4">Recent Commands</h2>
+        <div class="bg-gray-900 rounded-lg p-4 font-mono text-sm">
+            {% if terminal_output %}
+            <pre class="whitespace-pre-wrap text-green-400">{{ terminal_output | e }}</pre>
+            {% else %}
+            <p class="text-gray-400">No recent commands found...</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Graph Section -->
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <div class="flex flex-col md:flex-row justify-between items-center mb-6">
+            <h2 class="text-xl font-semibold text-gray-800">Online Users History</h2>
+            <div class="mt-4 md:mt-0">
+                <form method="POST" action="{{ url_for('refresh_online_data') }}">
+                    <button type="submit" 
+                            class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                        Refresh Now
+                    </button>
+                </form>
+            </div>
+        </div>
+        <div class="h-[400px]">
+            <canvas id="onlineChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<script>
+    let chart;
+    let refreshInterval;
+
+    // Função para carregar dados automaticamente
+    async function loadDashboardData() {
+        try {
+            // Carregar dados PPPoE
+            const pppoeResponse = await fetch('/api/online_total');
+            const pppoeData = await pppoeResponse.json();
+            
+            if (pppoeData && !pppoeData.error) {
+                document.getElementById('total-users').textContent = pppoeData.total || 0;
+                document.getElementById('active-sessions').textContent = pppoeData.active || 0;
+                document.getElementById('peak-users').textContent = pppoeData.peak || 0;
+                
+                const updateTime = pppoeData.last_update ? 
+                    new Date(pppoeData.last_update).toLocaleTimeString() : 'Nunca';
+                document.getElementById('total-updated').textContent = `Atualizado: ${updateTime}`;
+                document.getElementById('active-updated').textContent = `Atualizado: ${updateTime}`;
+                document.getElementById('peak-updated').textContent = `Atualizado: ${updateTime}`;
+
+                // Atualizar gráfico
+                if (pppoeData.history && pppoeData.history.length > 0) {
+                    updateChart(pppoeData.history);
+                }
+            }
+
+            // Carregar métricas do sistema
+            const systemResponse = await fetch('/api/system_metrics');
+            const systemData = await systemResponse.json();
+            
+            if (systemData && !systemData.error) {
+                document.getElementById('cpu-usage').textContent = `${systemData.cpu || 0}%`;
+                document.getElementById('ram-usage').textContent = `${systemData.memory || 0}%`;
+                
+                const systemUpdateTime = systemData.last_update ? 
+                    new Date(systemData.last_update).toLocaleTimeString() : 'Nunca';
+                document.getElementById('system-updated').textContent = `Atualizado: ${systemUpdateTime}`;
+            }
+
+            // Verificar status do background service
+            const serviceResponse = await fetch('/api/background_service_status');
+            const serviceData = await serviceResponse.json();
+            
+            if (serviceData && serviceData.service) {
+                const isRunning = serviceData.service.running;
+                const statusText = isRunning ? 
+                    '✅ Serviço de background ativo - dados atualizados automaticamente' :
+                    '⚠️ Serviço de background inativo - dados podem estar desatualizados';
+                
+                document.getElementById('service-status').textContent = statusText;
+            }
+
+        } catch (error) {
+            console.error('Erro ao carregar dados do dashboard:', error);
+            document.getElementById('service-status').textContent = 
+                '❌ Erro ao conectar com o servidor - verifique a conexão';
+        }
+    }
+
+    // Função para atualizar o gráfico
+    function updateChart(historyData) {
+        const labels = historyData.map(item => 
+            new Date(item.timestamp).toLocaleTimeString()
+        );
+        const data = historyData.map(item => item.total);
+
+        if (chart) {
+            chart.data.labels = labels;
+            chart.data.datasets[0].data = data;
+            chart.update();
+        } else {
+            const ctx = document.getElementById('onlineChart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Online Users',
+                        data: data,
+                        fill: false,
+                        borderColor: 'rgb(59, 130, 246)',
+                        tension: 0.1,
+                        borderWidth: 2,
+                        pointBackgroundColor: 'rgb(59, 130, 246)'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(0,0,0,0.1)'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    // Função para forçar refresh
+    async function forceRefresh() {
+        try {
+            document.getElementById('service-status').textContent = 'Solicitando atualização...';
+            
+            const response = await fetch('/api/force_cache_refresh', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                document.getElementById('service-status').textContent = 
+                    '✅ Atualização solicitada - dados serão atualizados em breve';
+                
+                // Recarregar dados após 3 segundos
+                setTimeout(loadDashboardData, 3000);
+            } else {
+                document.getElementById('service-status').textContent = 
+                    '❌ Erro ao solicitar atualização: ' + (result.error || 'Erro desconhecido');
+            }
+        } catch (error) {
+            console.error('Erro ao forçar refresh:', error);
+            document.getElementById('service-status').textContent = 
+                '❌ Erro ao solicitar atualização';
+        }
+    }
+
+    // Carregar dados imediatamente quando a página carrega
+    document.addEventListener('DOMContentLoaded', function() {
+        loadDashboardData();
+        
+        // Configurar refresh automático a cada 30 segundos
+        refreshInterval = setInterval(loadDashboardData, 30000);
+    });
+
+    // Limpar interval quando sair da página
+    window.addEventListener('beforeunload', function() {
+        if (refreshInterval) {
+            clearInterval(refreshInterval);
+        }
+    });
+</script>
+{% endblock %}

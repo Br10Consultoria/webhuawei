@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-6">
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 space-y-4 lg:space-y-0">
+            <h2 class="text-2xl font-semibold text-gray-800">System Logs</h2>
+            
+            <!-- Controles de Filtro -->
+            <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
+                <!-- Filtro por Nível -->
+                <select id="levelFilter" class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">Todos os Níveis</option>
+                    <option value="INFO">INFO</option>
+                    <option value="WARNING">WARNING</option>
+                    <option value="ERROR">ERROR</option>
+                    <option value="DEBUG">DEBUG</option>
+                </select>
+                
+                <!-- Campo de Busca -->
+                <input type="text" id="searchFilter" placeholder="Buscar nos logs..." 
+                       class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-[200px]">
+                
+                <!-- Botão Refresh -->
+                <button onclick="refreshLogs()" 
+                        class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap">
+                    🔄 Refresh
+                </button>
+                
+                <!-- Botão Clear -->
+                <button onclick="clearFilters()" 
+                        class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors whitespace-nowrap">
+                    🗑️ Limpar
+                </button>
+            </div>
+        </div>
+        
+        <!-- Estatísticas dos Logs -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <div class="text-blue-600 text-sm font-medium">Total</div>
+                <div class="text-2xl font-bold text-blue-800" id="totalCount">{{ logs|length }}</div>
+            </div>
+            <div class="bg-green-50 p-4 rounded-lg border border-green-200">
+                <div class="text-green-600 text-sm font-medium">INFO</div>
+                <div class="text-2xl font-bold text-green-800" id="infoCount">0</div>
+            </div>
+            <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                <div class="text-yellow-600 text-sm font-medium">WARNING</div>
+                <div class="text-2xl font-bold text-yellow-800" id="warningCount">0</div>
+            </div>
+            <div class="bg-red-50 p-4 rounded-lg border border-red-200">
+                <div class="text-red-600 text-sm font-medium">ERROR</div>
+                <div class="text-2xl font-bold text-red-800" id="errorCount">0</div>
+            </div>
+        </div>
+        
+        <!-- Container dos Logs -->
+        <div class="bg-gray-900 rounded-lg overflow-hidden">
+            <div class="max-h-[600px] overflow-auto" id="logsContainer">
+                {% if logs %}
+                    {% for log in logs %}
+                    <div class="log-entry border-b border-gray-700 p-3 hover:bg-gray-800 transition-colors" 
+                         data-level="{{ log.level }}" 
+                         data-message="{{ log.message|lower }}"
+                         data-timestamp="{{ log.timestamp }}">
+                        <div class="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-4">
+                            <!-- Timestamp -->
+                            <div class="text-gray-400 text-xs font-mono whitespace-nowrap">
+                                {{ log.timestamp }}
+                            </div>
+                            
+                            <!-- Level Badge -->
+                            <div class="flex-shrink-0">
+                                {% if log.level == 'ERROR' %}
+                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                        🔴 ERROR
+                                    </span>
+                                {% elif log.level == 'WARNING' %}
+                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                        🟡 WARNING
+                                    </span>
+                                {% elif log.level == 'INFO' %}
+                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                        🟢 INFO
+                                    </span>
+                                {% else %}
+                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                        ⚪ {{ log.level }}
+                                    </span>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Message -->
+                            <div class="text-gray-300 text-sm font-mono flex-1 break-all">
+                                {{ log.message }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="p-8 text-center">
+                        <div class="text-gray-400 text-lg">📝 Nenhum log disponível</div>
+                        <div class="text-gray-500 text-sm mt-2">Os logs aparecerão aqui quando a aplicação gerar eventos</div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Informações de Filtro -->
+        <div class="mt-4 text-sm text-gray-500" id="filterInfo">
+            Mostrando todos os logs
+        </div>
+    </div>
+</div>
+
+<script>
+let allLogs = [];
+let filteredLogs = [];
+
+// Inicializar dados dos logs
+document.addEventListener('DOMContentLoaded', function() {
+    allLogs = Array.from(document.querySelectorAll('.log-entry'));
+    filteredLogs = [...allLogs];
+    updateStats();
+    
+    // Event listeners para filtros
+    document.getElementById('levelFilter').addEventListener('change', applyFilters);
+    document.getElementById('searchFilter').addEventListener('input', applyFilters);
+});
+
+function updateStats() {
+    const stats = {
+        total: filteredLogs.length,
+        info: 0,
+        warning: 0,
+        error: 0
+    };
+    
+    filteredLogs.forEach(log => {
+        const level = log.dataset.level.toLowerCase();
+        if (level === 'info') stats.info++;
+        else if (level === 'warning') stats.warning++;
+        else if (level === 'error') stats.error++;
+    });
+    
+    document.getElementById('totalCount').textContent = stats.total;
+    document.getElementById('infoCount').textContent = stats.info;
+    document.getElementById('warningCount').textContent = stats.warning;
+    document.getElementById('errorCount').textContent = stats.error;
+}
+
+function applyFilters() {
+    const levelFilter = document.getElementById('levelFilter').value.toLowerCase();
+    const searchFilter = document.getElementById('searchFilter').value.toLowerCase();
+    
+    filteredLogs = allLogs.filter(log => {
+        const level = log.dataset.level.toLowerCase();
+        const message = log.dataset.message;
+        
+        const levelMatch = !levelFilter || level === levelFilter;
+        const searchMatch = !searchFilter || message.includes(searchFilter);
+        
+        return levelMatch && searchMatch;
+    });
+    
+    // Mostrar/ocultar logs
+    allLogs.forEach(log => {
+        if (filteredLogs.includes(log)) {
+            log.style.display = 'block';
+        } else {
+            log.style.display = 'none';
+        }
+    });
+    
+    updateStats();
+    updateFilterInfo();
+}
+
+function updateFilterInfo() {
+    const levelFilter = document.getElementById('levelFilter').value;
+    const searchFilter = document.getElementById('searchFilter').value;
+    const filterInfo = document.getElementById('filterInfo');
+    
+    let info = `Mostrando ${filteredLogs.length} de ${allLogs.length} logs`;
+    
+    const filters = [];
+    if (levelFilter) filters.push(`Nível: ${levelFilter}`);
+    if (searchFilter) filters.push(`Busca: "${searchFilter}"`);
+    
+    if (filters.length > 0) {
+        info += ` (Filtros: ${filters.join(', ')})`;
+    }
+    
+    filterInfo.textContent = info;
+}
+
+function clearFilters() {
+    document.getElementById('levelFilter').value = '';
+    document.getElementById('searchFilter').value = '';
+    applyFilters();
+}
+
+function refreshLogs() {
+    window.location.reload();
+}
+
+// Auto-scroll para o final dos logs
+function scrollToBottom() {
+    const container = document.getElementById('logsContainer');
+    container.scrollTop = container.scrollHeight;
+}
+
+// Scroll para o final quando a página carrega
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(scrollToBottom, 100);
+});
+</script>
+{% endblock %}

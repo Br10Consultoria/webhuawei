@@ -1,0 +1,45 @@
+# Translations template for NE8000 Router Management.
+# Copyright (C) 2024 Avance Telecom
+# This file is distributed under the same license as the project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2024.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: 1.0\n"
+"Report-Msgid-Bugs-To: suporte@avancetelecom.com.br\n"
+"POT-Creation-Date: 2024-02-20 10:00-0300\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.12.1\n"
+
+# Mensagens em português
+msgid "Home"
+msgstr "Início"
+
+msgid "Command History"
+msgstr "Histórico de Comandos"
+
+msgid "Live Terminal"
+msgstr "Terminal"
+
+msgid "Statistics"
+msgstr "Estatísticas"
+
+msgid "Logout"
+msgstr "Sair"
+
+msgid "Query Router Information"
+msgstr "Consultar Informações do Roteador"
+
+msgid "Username or Interface"
+msgstr "Usuário ou Interface"
+
+msgid "Execute Query"
+msgstr "Executar Consulta"
+
+# ... adicione mais traduções conforme necessário 

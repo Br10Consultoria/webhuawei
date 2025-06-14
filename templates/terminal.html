@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-6">
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-semibold text-gray-800">Router Terminal</h2>
+            <div class="flex space-x-2">
+                <button onclick="clearTerminal()" 
+                        class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors">
+                    🗑️ Clear
+                </button>
+                <button onclick="connectTerminal()" id="connectBtn"
+                        class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors">
+                    🔌 Connect
+                </button>
+                <button onclick="disconnectTerminal()" id="disconnectBtn" style="display: none;"
+                        class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors">
+                    🔌 Disconnect
+                </button>
+            </div>
+        </div>
+        
+        <!-- Terminal Container -->
+        <div class="bg-gray-900 rounded-lg overflow-hidden">
+            <div class="bg-gray-800 px-4 py-2 border-b border-gray-700">
+                <div class="flex items-center space-x-2">
+                    <div class="w-3 h-3 bg-red-500 rounded-full"></div>
+                    <div class="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                    <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+                    <span class="text-gray-400 text-sm ml-4">Router Terminal</span>
+                </div>
+            </div>
+            <div id="terminal" class="h-[600px]"></div>
+        </div>
+        
+        <!-- Command Input -->
+        <div class="mt-4">
+            <div class="flex space-x-2">
+                <input type="text" id="commandInput" 
+                       class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                       placeholder="Digite um comando..." 
+                       onkeypress="handleKeyPress(event)">
+                <button onclick="sendCommand()" 
+                        class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                    Send
+                </button>
+            </div>
+        </div>
+        
+        <!-- Quick Commands -->
+        <div class="mt-4">
+            <h3 class="text-sm font-medium text-gray-700 mb-2">Quick Commands:</h3>
+            <div class="flex flex-wrap gap-2">
+                <button onclick="quickCommand('display access-user online-total')" 
+                        class="bg-gray-100 text-gray-700 px-3 py-1 rounded text-sm hover:bg-gray-200 transition-colors">
+                    Online Users
+                </button>
+                <button onclick="quickCommand('display interface brief')" 
+                        class="bg-gray-100 text-gray-700 px-3 py-1 rounded text-sm hover:bg-gray-200 transition-colors">
+                    Interface Brief
+                </button>
+                <button onclick="quickCommand('display version')" 
+                        class="bg-gray-100 text-gray-700 px-3 py-1 rounded text-sm hover:bg-gray-200 transition-colors">
+                    Version
+                </button>
+                <button onclick="quickCommand('display cpu-usage')" 
+                        class="bg-gray-100 text-gray-700 px-3 py-1 rounded text-sm hover:bg-gray-200 transition-colors">
+                    CPU Usage
+                </button>
+                <button onclick="quickCommand('display memory-usage')" 
+                        class="bg-gray-100 text-gray-700 px-3 py-1 rounded text-sm hover:bg-gray-200 transition-colors">
+                    Memory Usage
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let term = null;
+let isConnected = false;
+
+// Inicializar terminal
+document.addEventListener('DOMContentLoaded', function() {
+    term = new Terminal({
+        cursorBlink: true,
+        theme: {
+            background: '#111827',
+            foreground: '#ffffff',
+            cursor: '#ffffff',
+            selection: 'rgba(255, 255, 255, 0.3)'
+        },
+        fontSize: 14,
+        lineHeight: 1.5,
+        padding: 10,
+        scrollback: 1000
+    });
+    
+    term.open(document.getElementById('terminal'));
+    showWelcomeMessage();
+});
+
+function showWelcomeMessage() {
+    term.writeln('\x1B[1;32m╔══════════════════════════════════════════════════════════════╗\x1B[0m');
+    term.writeln('\x1B[1;32m║                    Router Terminal                           ║\x1B[0m');
+    term.writeln('\x1B[1;32m╚══════════════════════════════════════════════════════════════╝\x1B[0m');
+    term.writeln('');
+    term.writeln('\x1B[1;33mWelcome to Router Management Console\x1B[0m');
+    term.writeln('\x1B[36mClick "Connect" to establish connection with the router\x1B[0m');
+    term.writeln('');
+    term.writeln('\x1B[90m' + '─'.repeat(60) + '\x1B[0m');
+    term.writeln('');
+}
+
+async function connectTerminal() {
+    if (!isConnected) {
+        term.writeln('\x1B[1;33m[INFO]\x1B[0m Iniciando conexão com o router...');
+        term.writeln('\x1B[1;33m[INFO]\x1B[0m Estabelecendo sessão SSH...');
+        
+        try {
+            // Fazer uma chamada real para estabelecer conexão
+            const response = await fetch('/api/router_connect', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                term.writeln('\x1B[1;32m[SUCCESS]\x1B[0m Conexão estabelecida com sucesso!');
+                term.writeln('\x1B[1;32m[INFO]\x1B[0m Router: ' + (data.router_info || 'Connected'));
+                term.writeln('\x1B[1;32m[INFO]\x1B[0m Pronto para receber comandos');
+                term.writeln('');
+                isConnected = true;
+                
+                // Update buttons
+                document.getElementById('connectBtn').style.display = 'none';
+                document.getElementById('disconnectBtn').style.display = 'inline-block';
+            } else {
+                term.writeln('\x1B[1;31m[ERROR]\x1B[0m Falha na conexão: ' + (data.error || 'Erro desconhecido'));
+                term.writeln('\x1B[1;31m[ERROR]\x1B[0m Verifique as configurações de rede');
+            }
+        } catch (error) {
+            term.writeln('\x1B[1;31m[ERROR]\x1B[0m Erro de conexão: ' + error.message);
+        }
+        
+        term.writeln('');
+    }
+}
+
+async function disconnectTerminal() {
+    if (isConnected) {
+        term.writeln('\x1B[1;33m[INFO]\x1B[0m Desconectando do router...');
+        
+        try {
+            const response = await fetch('/api/router_disconnect', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                term.writeln('\x1B[1;32m[INFO]\x1B[0m Desconectado com sucesso');
+                isConnected = false;
+                
+                // Update buttons
+                document.getElementById('connectBtn').style.display = 'inline-block';
+                document.getElementById('disconnectBtn').style.display = 'none';
+            } else {
+                term.writeln('\x1B[1;31m[ERROR]\x1B[0m Erro ao desconectar: ' + (data.error || 'Erro desconhecido'));
+            }
+        } catch (error) {
+            term.writeln('\x1B[1;31m[ERROR]\x1B[0m Erro: ' + error.message);
+        }
+        
+        term.writeln('');
+    }
+}
+
+function clearTerminal() {
+    term.clear();
+    showWelcomeMessage();
+}
+
+function handleKeyPress(event) {
+    if (event.key === 'Enter') {
+        sendCommand();
+    }
+}
+
+async function sendCommand() {
+    const input = document.getElementById('commandInput');
+    const command = input.value.trim();
+    
+    if (!command) return;
+    
+    if (!isConnected) {
+        term.writeln('\x1B[1;31m[ERROR]\x1B[0m Please connect to router first');
+        return;
+    }
+    
+    // Show command being executed
+    term.writeln('\x1B[1;36mRouter>\x1B[0m ' + command);
+    
+    try {
+        // Send command to backend
+        const response = await fetch('/api/execute_terminal_command', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ command: command })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Display command output
+            const output = data.output || 'Command executed successfully';
+            const lines = output.split('\n');
+            lines.forEach(line => {
+                term.writeln('\x1B[37m' + line + '\x1B[0m');
+            });
+        } else {
+            term.writeln('\x1B[1;31m[ERROR]\x1B[0m ' + (data.error || 'Command failed'));
+        }
+    } catch (error) {
+        term.writeln('\x1B[1;31m[ERROR]\x1B[0m Failed to execute command: ' + error.message);
+    }
+    
+    term.writeln('');
+    input.value = '';
+}
+
+function quickCommand(command) {
+    document.getElementById('commandInput').value = command;
+    sendCommand();
+}
+
+// Auto-scroll to bottom
+function scrollToBottom() {
+    term.scrollToBottom();
+}
+</script>
+{% endblock %} 

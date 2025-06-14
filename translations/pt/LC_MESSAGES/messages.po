@@ -1,0 +1,46 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: pt\n"
+
+msgid "Home"
+msgstr "Início"
+
+msgid "History"
+msgstr "Histórico"
+
+msgid "Terminal"
+msgstr "Terminal"
+
+msgid "Logout"
+msgstr "Sair"
+
+msgid "Login successful"
+msgstr "Login realizado com sucesso"
+
+msgid "Invalid credentials"
+msgstr "Credenciais inválidas"
+
+msgid "Logged out successfully"
+msgstr "Logout realizado com sucesso"
+
+msgid "Command History"
+msgstr "Histórico de Comandos"
+
+msgid "Live Terminal"
+msgstr "Terminal"
+
+msgid "Statistics"
+msgstr "Estatísticas"
+
+msgid "Query Router Information"
+msgstr "Consultar Informações do Roteador"
+
+msgid "Username or Interface"
+msgstr "Usuário ou Interface"
+
+msgid "Execute Query"
+msgstr "Executar Consulta"
+
+# ... adicione mais traduções conforme necessário 
