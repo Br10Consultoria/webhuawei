@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-6">
+    <!-- Cabeçalho -->
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <div class="flex items-center justify-between">
+            <h2 class="text-2xl font-semibold text-gray-800">📊 Histórico de Conexões</h2>
+            <div class="flex items-center space-x-4">
+                <span class="text-sm text-gray-600">Usuário:</span>
+                <span class="font-mono text-lg font-semibold text-blue-600">{{ username }}</span>
+                <button onclick="refreshHistory()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                    🔄 Atualizar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Histórico de Logs -->
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Logs de Conexão</h3>
+        <div id="historyContainer">
+            <div class="text-center text-gray-500 py-8">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                Carregando histórico...
+            </div>
+        </div>
+    </div>
+
+    <!-- Estatísticas -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <h4 class="text-md font-semibold text-gray-800 mb-2">Conexões</h4>
+            <div class="text-2xl font-bold text-green-600" id="totalConnections">-</div>
+            <div class="text-sm text-gray-600">Total de conexões</div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <h4 class="text-md font-semibold text-gray-800 mb-2">Desconexões</h4>
+            <div class="text-2xl font-bold text-red-600" id="totalDisconnections">-</div>
+            <div class="text-sm text-gray-600">Total de desconexões</div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <h4 class="text-md font-semibold text-gray-800 mb-2">Falhas de Auth</h4>
+            <div class="text-2xl font-bold text-orange-600" id="totalAuthFailures">-</div>
+            <div class="text-sm text-gray-600">Falhas de autenticação</div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadHistory();
+});
+
+async function loadHistory() {
+    try {
+        const username = '{{ username }}';
+        const response = await fetch(`/api/pppoe_history/${username}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            displayHistory(data);
+        } else {
+            document.getElementById('historyContainer').innerHTML = 
+                '<div class="text-center text-red-500 py-4">Erro ao carregar histórico</div>';
+        }
+    } catch (error) {
+        console.error('Erro ao carregar histórico:', error);
+        document.getElementById('historyContainer').innerHTML = 
+            '<div class="text-center text-red-500 py-4">Erro de conexão</div>';
+    }
+}
+
+function displayHistory(data) {
+    const container = document.getElementById('historyContainer');
+    const logs = data.logs || [];
+    
+    if (logs.length === 0) {
+        container.innerHTML = '<div class="text-center text-gray-500 py-4">Nenhum histórico encontrado</div>';
+        return;
+    }
+    
+    let html = '<div class="space-y-2">';
+    logs.forEach(log => {
+        const typeClass = getLogTypeClass(log.type);
+        html += `
+            <div class="border-l-4 ${typeClass} pl-4 py-2 bg-gray-50 rounded-r">
+                <div class="text-sm text-gray-600">${log.timestamp}</div>
+                <div class="text-sm font-medium">${log.type.replace('_', ' ').toUpperCase()}</div>
+                <div class="text-sm text-gray-800">${log.raw_line}</div>
+            </div>
+        `;
+    });
+    html += '</div>';
+    
+    container.innerHTML = html;
+    
+    // Atualizar estatísticas
+    updateStats(logs);
+}
+
+function getLogTypeClass(type) {
+    switch (type) {
+        case 'connection_logs': return 'border-green-500';
+        case 'disconnection_logs': return 'border-red-500';
+        case 'auth_logs': return 'border-blue-500';
+        case 'session_logs': return 'border-purple-500';
+        default: return 'border-gray-500';
+    }
+}
+
+function updateStats(logs) {
+    const connections = logs.filter(log => log.type === 'connection_logs').length;
+    const disconnections = logs.filter(log => log.type === 'disconnection_logs').length;
+    const authFailures = logs.filter(log => log.type === 'auth_logs').length;
+    
+    document.getElementById('totalConnections').textContent = connections;
+    document.getElementById('totalDisconnections').textContent = disconnections;
+    document.getElementById('totalAuthFailures').textContent = authFailures;
+}
+
+async function refreshHistory() {
+    loadHistory();
+}
+</script>
+{% endblock %} 

@@ -1,0 +1,387 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-6">
+    <!-- Status do Background Service -->
+    <div class="bg-blue-50 border-l-4 border-blue-400 p-4 rounded-lg">
+        <div class="flex items-center">
+            <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                </svg>
+            </div>
+            <div class="ml-3">
+                <p class="text-sm text-blue-700">
+                    <span id="service-status">Verificando status do serviço...</span>
+                    <button onclick="forceRefresh()" class="ml-4 text-blue-600 hover:text-blue-800 underline">
+                        Forçar Atualização
+                    </button>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Error Banner -->
+    <div id="error-banner" class="hidden bg-red-50 border-l-4 border-red-400 p-4">
+        <div class="flex">
+            <div class="ml-3">
+                <p class="text-sm text-red-700" id="error-msg"></p>
+            </div>
+            <div class="ml-auto">
+                <button onclick="dismissError()" class="text-red-400 hover:text-red-600">
+                    <span class="sr-only">Dismiss</span>
+                    ×
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Controles -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
+        <div class="flex justify-between items-center">
+            <div>
+                <h2 class="text-lg font-semibold text-gray-800">Controles do Sistema</h2>
+                <p class="text-sm text-gray-600">Status: <span id="connection-status" class="font-medium">Verificando conexão...</span></p>
+            </div>
+            <div class="flex space-x-3">
+                <button onclick="reconnectSSH()" id="reconnect-btn" 
+                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                    🔌 Reconectar SSH
+                </button>
+                <button onclick="forceRefresh()" 
+                        class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                    🔄 Atualizar Agora
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <div class="flex flex-col items-center">
+                <h3 class="text-lg font-medium text-gray-600">Total Online Users</h3>
+                <p id="total-users" class="text-4xl font-bold text-blue-600 mt-2">-</p>
+                <p id="total-updated" class="text-sm text-gray-500 mt-2">Carregando...</p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <div class="flex flex-col items-center">
+                <h3 class="text-lg font-medium text-gray-600">Active Sessions</h3>
+                <p id="active-sessions" class="text-4xl font-bold text-green-600 mt-2">-</p>
+                <p id="active-updated" class="text-sm text-gray-500 mt-2">Carregando...</p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <div class="flex flex-col items-center">
+                <h3 class="text-lg font-medium text-gray-600">Peak Users</h3>
+                <p id="peak-users" class="text-4xl font-bold text-purple-600 mt-2">-</p>
+                <p id="peak-updated" class="text-sm text-gray-500 mt-2">Carregando...</p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <div class="flex flex-col items-center">
+                <h3 class="text-lg font-medium text-gray-600">Sistema</h3>
+                <div class="mt-2 text-center">
+                    <p class="text-lg font-semibold text-gray-700">CPU: <span id="cpu-usage">-%</span></p>
+                    <p class="text-lg font-semibold text-gray-700">RAM: <span id="ram-usage">-%</span></p>
+                </div>
+                <p id="system-updated" class="text-sm text-gray-500 mt-2">Carregando...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Ações Rápidas</h3>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <a href="/pppoe" 
+               class="flex flex-col items-center p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
+                <div class="text-3xl mb-2">🔍</div>
+                <div class="text-sm font-medium text-blue-800">Consulta PPPoE</div>
+            </a>
+            
+            <a href="/interfaces/pppoe" 
+               class="flex flex-col items-center p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-colors">
+                <div class="text-3xl mb-2">🔧</div>
+                <div class="text-sm font-medium text-green-800">Interfaces PPPoE</div>
+            </a>
+            
+            <a href="/interfaces/traffic" 
+               class="flex flex-col items-center p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors">
+                <div class="text-3xl mb-2">📊</div>
+                <div class="text-sm font-medium text-purple-800">Tráfego Interfaces</div>
+            </a>
+            
+            <a href="/docs" 
+               class="flex flex-col items-center p-4 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors">
+                <div class="text-3xl mb-2">📖</div>
+                <div class="text-sm font-medium text-orange-800">API Docs</div>
+            </a>
+        </div>
+    </div>
+
+    <!-- Graph Section -->
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <div class="flex flex-col md:flex-row justify-between items-center mb-6">
+            <h2 class="text-xl font-semibold text-gray-800">Online Users History</h2>
+            <div class="mt-4 md:mt-0">
+                <button onclick="forceRefresh()" 
+                        class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                    Refresh Chart
+                </button>
+            </div>
+        </div>
+        <div class="h-[400px]" id="chart-container">
+            <canvas id="onlineChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<script>
+    let chart;
+    let refreshInterval;
+
+    // Auto-refresh a cada 30 segundos
+    setInterval(() => {
+        loadDashboardData();
+    }, 30000);
+
+    // Carregar dados na inicialização
+    document.addEventListener('DOMContentLoaded', function() {
+        loadDashboardData();
+    });
+
+    async function loadDashboardData() {
+        try {
+            console.log('🔄 Carregando dados do dashboard...');
+            
+            // Status da conexão
+            await updateConnectionStatus();
+            
+            // Dados PPPoE
+            await updatePPPoEData();
+            
+            // Métricas do sistema
+            await updateSystemMetrics();
+            
+            // Status do serviço
+            await updateServiceStatus();
+            
+            console.log('✅ Dados carregados com sucesso');
+            
+        } catch (error) {
+            console.error('❌ Erro ao carregar dados:', error);
+            document.getElementById('error-msg').textContent = 'Erro ao carregar dados: ' + error.message;
+            document.getElementById('error-banner').classList.remove('hidden');
+        }
+    }
+
+    async function updateConnectionStatus() {
+        try {
+            const response = await fetch('/api/connection_status');
+            const data = await response.json();
+            
+            const statusElement = document.getElementById('connection-status');
+            if (data.connected) {
+                statusElement.textContent = `✅ Conectado a ${data.host}:${data.port}`;
+                statusElement.className = 'font-medium text-green-600';
+            } else {
+                statusElement.textContent = `❌ Desconectado de ${data.host}:${data.port}`;
+                statusElement.className = 'font-medium text-red-600';
+            }
+        } catch (error) {
+            console.error('Erro ao verificar status da conexão:', error);
+            const statusElement = document.getElementById('connection-status');
+            statusElement.textContent = '❌ Erro de conexão';
+            statusElement.className = 'font-medium text-red-600';
+        }
+    }
+
+    async function updatePPPoEData() {
+        try {
+            const response = await fetch('/api/online_total');
+            const data = await response.json();
+            
+            console.log('PPPoE Data:', data);
+            
+            if (data && !data.error) {
+                document.getElementById('total-users').textContent = data.total || 0;
+                document.getElementById('active-sessions').textContent = data.active || 0;
+                document.getElementById('peak-users').textContent = data.peak || 0;
+                
+                const updateTime = data.last_update ? 
+                    new Date(data.last_update).toLocaleTimeString() : 'Nunca';
+                document.getElementById('total-updated').textContent = `Atualizado: ${updateTime}`;
+                document.getElementById('active-updated').textContent = `Atualizado: ${updateTime}`;
+                document.getElementById('peak-updated').textContent = `Atualizado: ${updateTime}`;
+
+                // Atualizar gráfico se houver dados de histórico
+                if (data.history && data.history.length > 0) {
+                    updateChart(data.history);
+                }
+            } else {
+                console.warn('Erro PPPoE:', data.error);
+            }
+        } catch (error) {
+            console.error('Erro ao buscar dados PPPoE:', error);
+        }
+    }
+
+    async function updateSystemMetrics() {
+        try {
+            const response = await fetch('/api/system_metrics');
+            const data = await response.json();
+            
+            console.log('System Data:', data);
+            
+            if (data && !data.error) {
+                document.getElementById('cpu-usage').textContent = `${data.cpu || 0}%`;
+                document.getElementById('ram-usage').textContent = `${data.memory || 0}%`;
+                
+                const systemUpdateTime = data.last_update ? 
+                    new Date(data.last_update).toLocaleTimeString() : 'Nunca';
+                document.getElementById('system-updated').textContent = `Atualizado: ${systemUpdateTime}`;
+            }
+        } catch (error) {
+            console.error('Erro ao buscar métricas do sistema:', error);
+        }
+    }
+
+    async function updateServiceStatus() {
+        try {
+            const response = await fetch('/api/background_service_status');
+            const data = await response.json();
+            
+            if (data && data.service) {
+                const isRunning = data.service.running;
+                const statusText = isRunning ? 
+                    '✅ Serviço de background ativo - dados atualizados automaticamente' :
+                    '⚠️ Serviço de background inativo - dados podem estar desatualizados';
+                
+                document.getElementById('service-status').textContent = statusText;
+            }
+        } catch (error) {
+            console.error('Erro ao verificar status do serviço:', error);
+            document.getElementById('service-status').textContent = 
+                '❌ Erro ao conectar com o servidor - verifique a conexão';
+        }
+    }
+
+    // Função para atualizar o gráfico
+    function updateChart(historyData) {
+        const labels = historyData.map(item => 
+            new Date(item.timestamp).toLocaleTimeString()
+        );
+        const data = historyData.map(item => item.total);
+
+        if (chart) {
+            chart.data.labels = labels;
+            chart.data.datasets[0].data = data;
+            chart.update();
+        } else {
+            const ctx = document.getElementById('onlineChart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Online Users',
+                        data: data,
+                        fill: false,
+                        borderColor: 'rgb(59, 130, 246)',
+                        tension: 0.1,
+                        borderWidth: 2,
+                        pointBackgroundColor: 'rgb(59, 130, 246)'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(0,0,0,0.1)'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    async function reconnectSSH() {
+        try {
+            document.getElementById('reconnect-btn').textContent = 'Reconectando...';
+            document.getElementById('reconnect-btn').disabled = true;
+            
+            const response = await fetch('/api/reconnect', { method: 'POST' });
+            const data = await response.json();
+            
+            if (data.success) {
+                showMessage('✅ Reconexão SSH bem-sucedida!', 'success');
+                loadDashboardData();
+            } else {
+                showMessage('❌ Falha na reconexão: ' + data.error, 'error');
+            }
+        } catch (error) {
+            showMessage('❌ Erro na reconexão: ' + error.message, 'error');
+        } finally {
+            document.getElementById('reconnect-btn').textContent = '🔌 Reconectar SSH';
+            document.getElementById('reconnect-btn').disabled = false;
+        }
+    }
+
+    async function forceRefresh() {
+        try {
+            document.getElementById('service-status').textContent = 'Solicitando atualização...';
+            
+            const response = await fetch('/api/force_cache_refresh', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                document.getElementById('service-status').textContent = 
+                    '✅ Atualização solicitada - dados serão atualizados em breve';
+                
+                // Recarregar dados após 3 segundos
+                setTimeout(loadDashboardData, 3000);
+            } else {
+                document.getElementById('service-status').textContent = 
+                    '❌ Erro ao solicitar atualização: ' + (result.error || 'Erro desconhecido');
+            }
+        } catch (error) {
+            console.error('Erro ao forçar refresh:', error);
+            await loadDashboardData();
+        }
+    }
+
+    function dismissError() {
+        document.getElementById('error-banner').classList.add('hidden');
+    }
+
+    // Limpar interval quando sair da página
+    window.addEventListener('beforeunload', function() {
+        if (refreshInterval) {
+            clearInterval(refreshInterval);
+        }
+    });
+</script>
+{% endblock %} 

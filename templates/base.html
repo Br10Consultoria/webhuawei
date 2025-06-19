@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}NE8000 Network Monitor{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col">
+    <!-- Fixed Navigation Bar -->
+    <nav class="fixed top-0 w-full bg-white shadow-sm z-50">
+        <div class="container mx-auto px-4">
+            <div class="flex justify-between items-center h-16">
+                <!-- Logo and Brand -->
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
+                        <span class="text-white text-xl font-bold">NE</span>
+                    </div>
+                    <span class="text-xl font-semibold text-gray-800">NE8000 Monitor</span>
+                </div>
+
+                {% if session.logged_in %}
+                <!-- Desktop Navigation -->
+                <div class="hidden md:flex items-center space-x-8">
+                    <a href="/dashboard" 
+                       class="text-gray-600 hover:text-blue-600 transition-colors">Dashboard</a>
+                    <a href="/pppoe" 
+                       class="text-gray-600 hover:text-blue-600 transition-colors">PPPoE</a>
+                    
+                    <!-- Menu Interfaces -->
+                    <div class="relative group">
+                        <button class="text-gray-600 hover:text-blue-600 transition-colors flex items-center">
+                            Interfaces
+                            <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </button>
+                        <div class="absolute left-0 mt-2 w-48 bg-white rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                            <div class="py-1">
+                                <a href="/interfaces/pppoe" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                    PPPoE por Interface
+                                </a>
+                                <a href="/interfaces/traffic" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                    Tráfego de Interfaces
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <a href="/docs" 
+                       class="text-gray-600 hover:text-blue-600 transition-colors">API Docs</a>
+                    
+                    <!-- User Menu -->
+                    <div class="flex items-center space-x-4">
+                        <!-- Router Status -->
+                        <div id="routerStatus" class="flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-medium bg-gray-100">
+                            <span id="statusDot" class="w-2 h-2 rounded-full bg-gray-400"></span>
+                            <span id="statusText" class="text-gray-600">Verificando...</span>
+                        </div>
+                        
+                        <!-- Clock -->
+                        <div class="bg-gray-100 px-3 py-1 rounded-full">
+                            <span id="digitalClock" class="text-sm text-gray-600 font-mono"></span>
+                        </div>
+                        
+                        <!-- Logout Button -->
+                        <a href="/logout" 
+                           class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors">
+                            Logout
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Mobile Menu Button (apenas quando logado) -->
+                <button class="md:hidden text-gray-600 hover:text-gray-800" id="mobile-menu-button">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                    </svg>
+                </button>
+                {% else %}
+                <!-- Not logged in - show minimal info -->
+                <div class="text-sm text-gray-500">
+                    Faça login para acessar o sistema
+                </div>
+                {% endif %}
+            </div>
+
+            {% if session.logged_in %}
+            <!-- Mobile Navigation -->
+            <div class="md:hidden hidden" id="mobile-menu">
+                <div class="px-2 pt-2 pb-3 space-y-1">
+                    <a href="/dashboard" 
+                       class="block px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100">Dashboard</a>
+                    <a href="/pppoe" 
+                       class="block px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100">PPPoE</a>
+                    
+                    <!-- Mobile Interfaces Menu -->
+                    <div class="px-3 py-2">
+                        <div class="text-gray-600 font-medium mb-2">Interfaces</div>
+                        <div class="ml-4 space-y-1">
+                            <a href="/interfaces/pppoe" 
+                               class="block px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100 text-sm">
+                                PPPoE por Interface
+                            </a>
+                            <a href="/interfaces/traffic" 
+                               class="block px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100 text-sm">
+                                Tráfego de Interfaces
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <a href="/docs" 
+                       class="block px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100">API Docs</a>
+                    
+                    <!-- Mobile Clock -->
+                    <div class="px-3 py-2">
+                        <span id="mobileClock" class="text-sm text-gray-600 font-mono"></span>
+                    </div>
+                    
+                    <!-- Mobile Logout -->
+                    <a href="/logout" 
+                       class="block px-3 py-2 text-red-600 hover:bg-red-50 rounded-md">Logout</a>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-grow container mx-auto px-4 pt-20 pb-16">
+        <!-- Messages Area -->
+        <div id="messages" class="mb-4"></div>
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-gray-200">
+        <div class="container mx-auto px-4 py-6">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="text-gray-600 text-sm">
+                    © 2025 NE8000 Network Monitor. Sistema Simplificado v2.0
+                </div>
+                {% if session.logged_in %}
+                <div class="flex space-x-6 mt-4 md:mt-0">
+                    <a href="/health" class="text-gray-500 hover:text-blue-600 text-sm">
+                        Health Check
+                    </a>
+                    <a href="/docs" class="text-gray-500 hover:text-blue-600 text-sm">
+                        API Documentation
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </footer>
+
+    <script>
+    // Only initialize interactive features if user is logged in
+    {% if session.logged_in %}
+    
+    // Mobile menu toggle
+    const mobileMenuButton = document.getElementById('mobile-menu-button');
+    const mobileMenu = document.getElementById('mobile-menu');
+    
+    if (mobileMenuButton && mobileMenu) {
+        mobileMenuButton.addEventListener('click', function() {
+            mobileMenu.classList.toggle('hidden');
+        });
+    }
+
+    // Clock functionality
+    function updateClock() {
+        const now = new Date();
+        const options = {
+            timeZone: 'America/Bahia',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            day: '2-digit',
+            month: '2-digit',
+            year: '2-digit',
+            hour12: false
+        };
+        const formatter = new Intl.DateTimeFormat('pt-BR', options);
+        const parts = formatter.formatToParts(now);
+        const clockStr = `${parts.find(p => p.type === 'day').value}/${parts.find(p => p.type === 'month').value}/${parts.find(p => p.type === 'year').value} ${parts.find(p => p.type === 'hour').value}:${parts.find(p => p.type === 'minute').value}:${parts.find(p => p.type === 'second').value}`;
+        
+        const clockElement = document.getElementById('digitalClock');
+        const mobileClockElement = document.getElementById('mobileClock');
+        
+        if (clockElement) clockElement.textContent = clockStr;
+        if (mobileClockElement) mobileClockElement.textContent = clockStr;
+    }
+    
+    // Start clock
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Router status check
+    async function checkRouterStatus() {
+        try {
+            const response = await fetch('/api/connection_status');
+            const data = await response.json();
+            
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+            const routerStatus = document.getElementById('routerStatus');
+            
+            if (!statusDot || !statusText || !routerStatus) return;
+            
+            if (data.connected) {
+                statusDot.className = 'w-2 h-2 rounded-full bg-green-500';
+                statusText.textContent = 'Online';
+                statusText.className = 'text-green-700';
+                routerStatus.className = 'flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-medium bg-green-100';
+            } else {
+                statusDot.className = 'w-2 h-2 rounded-full bg-yellow-500';
+                statusText.textContent = 'Cache';
+                statusText.className = 'text-yellow-700';
+                routerStatus.className = 'flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-medium bg-yellow-100';
+            }
+        } catch (error) {
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+            const routerStatus = document.getElementById('routerStatus');
+            
+            if (!statusDot || !statusText || !routerStatus) return;
+            
+            statusDot.className = 'w-2 h-2 rounded-full bg-red-500';
+            statusText.textContent = 'Erro';
+            statusText.className = 'text-red-700';
+            routerStatus.className = 'flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-medium bg-red-100';
+        }
+    }
+    
+    // Check router status every 30 seconds
+    setInterval(checkRouterStatus, 30000);
+    checkRouterStatus(); // Check immediately
+    
+    {% endif %}
+
+    // Função para mostrar mensagens (disponível sempre)
+    function showMessage(message, type = 'info') {
+        const messagesDiv = document.getElementById('messages');
+        if (!messagesDiv) return;
+        
+        const messageDiv = document.createElement('div');
+        
+        let bgColor = 'bg-blue-50 text-blue-700 border-blue-200';
+        if (type === 'error') bgColor = 'bg-red-50 text-red-700 border-red-200';
+        if (type === 'success') bgColor = 'bg-green-50 text-green-700 border-green-200';
+        if (type === 'warning') bgColor = 'bg-yellow-50 text-yellow-700 border-yellow-200';
+        
+        messageDiv.className = `p-4 rounded-lg border ${bgColor} mb-4`;
+        messageDiv.textContent = message;
+        
+        messagesDiv.appendChild(messageDiv);
+        
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            messageDiv.remove();
+        }, 5000);
+    }
+    </script>
+</body>
+</html>

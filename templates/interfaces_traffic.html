@@ -1,0 +1,266 @@
+{% extends "base.html" %}
+
+{% block title %}Tráfego de Interfaces - NE8000{% endblock %}
+
+{% block extra_css %}
+<style>
+.traffic-high { background: linear-gradient(45deg, #ff6b6b, #feca57); }
+.traffic-medium { background: linear-gradient(45deg, #48cae4, #023e8a); }
+.traffic-low { background: linear-gradient(45deg, #43aa8b, #90e0ef); }
+.bandwidth-bar {
+    height: 20px;
+    background: #e9ecef;
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+}
+.bandwidth-fill {
+    height: 100%;
+    background: linear-gradient(45deg, #28a745, #20c997);
+    border-radius: 10px;
+    transition: width 0.5s ease;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="fas fa-chart-line"></i> Tráfego de Interfaces</h2>
+                    <p class="text-muted">Monitoramento em tempo real de banda das interfaces de rede</p>
+                </div>
+                <div>
+                    <a href="/hybrid" class="btn btn-outline-primary">
+                        <i class="fas fa-arrow-left"></i> Voltar ao Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card traffic-high text-white">
+                <div class="card-body text-center">
+                    <h4 id="total-in-traffic">-</h4>
+                    <p class="mb-0">Tráfego de Entrada (Mbps)</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card traffic-medium text-white">
+                <div class="card-body text-center">
+                    <h4 id="total-out-traffic">-</h4>
+                    <p class="mb-0">Tráfego de Saída (Mbps)</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card traffic-low text-white">
+                <div class="card-body text-center">
+                    <h4 id="active-interfaces-count">-</h4>
+                    <p class="mb-0">Interfaces Ativas</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Real-time Chart -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-chart-area"></i> Tráfego Total em Tempo Real</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="realTimeTrafficChart" height="80"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Interfaces Table -->
+    <div class="card">
+        <div class="card-header">
+            <h5><i class="fas fa-table"></i> Detalhes por Interface</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Interface</th>
+                            <th>Status</th>
+                            <th>Entrada (Mbps)</th>
+                            <th>Saída (Mbps)</th>
+                            <th>Total (Mbps)</th>
+                            <th>Utilização</th>
+                            <th>Última Atualização</th>
+                        </tr>
+                    </thead>
+                    <tbody id="trafficTableBody">
+                        <tr>
+                            <td colspan="7" class="text-center">
+                                <div class="spinner-border" role="status"></div>
+                                <p class="mt-2">Carregando dados de tráfego...</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+let trafficChart;
+let trafficData = [];
+
+// Auto-refresh a cada 60 segundos
+setInterval(loadTrafficData, 60000);
+
+// Carregar dados iniciais
+$(document).ready(function() {
+    initializeChart();
+    loadTrafficData();
+});
+
+function initializeChart() {
+    const ctx = document.getElementById('realTimeTrafficChart').getContext('2d');
+    trafficChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Entrada (Mbps)',
+                data: [],
+                borderColor: 'rgb(40, 167, 69)',
+                backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                tension: 0.4
+            }, {
+                label: 'Saída (Mbps)',
+                data: [],
+                borderColor: 'rgb(255, 193, 7)',
+                backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+
+async function loadTrafficData() {
+    try {
+        const response = await fetch('/api/hybrid/network/traffic');
+        const data = await response.json();
+        
+        if (data.success) {
+            updateSummaryCards(data.summary);
+            updateTrafficChart(data.summary);
+            displayTrafficTable(data.interfaces);
+        } else {
+            showError('Erro ao carregar dados: ' + data.error);
+        }
+    } catch (error) {
+        console.error('Erro ao carregar tráfego:', error);
+        showError('Erro de conexão');
+    }
+}
+
+function updateSummaryCards(summary) {
+    document.getElementById('total-in-traffic').textContent = summary.total_in_mbps.toFixed(1);
+    document.getElementById('total-out-traffic').textContent = summary.total_out_mbps.toFixed(1);
+    document.getElementById('active-interfaces-count').textContent = summary.active_interfaces;
+}
+
+function updateTrafficChart(summary) {
+    const now = new Date().toLocaleTimeString();
+    
+    // Adicionar novo ponto
+    trafficChart.data.labels.push(now);
+    trafficChart.data.datasets[0].data.push(summary.total_in_mbps);
+    trafficChart.data.datasets[1].data.push(summary.total_out_mbps);
+    
+    // Manter apenas os últimos 20 pontos
+    if (trafficChart.data.labels.length > 20) {
+        trafficChart.data.labels.shift();
+        trafficChart.data.datasets[0].data.shift();
+        trafficChart.data.datasets[1].data.shift();
+    }
+    
+    trafficChart.update();
+}
+
+function displayTrafficTable(interfaces) {
+    const tbody = document.getElementById('trafficTableBody');
+    
+    if (!interfaces || interfaces.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="text-center text-muted">
+                    <p>Nenhum dado de tráfego disponível</p>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    let html = '';
+    interfaces.forEach(function(iface) {
+        const statusBadge = iface.status === 'up' 
+            ? '<span class="badge bg-success">UP</span>'
+            : '<span class="badge bg-danger">DOWN</span>';
+            
+        const utilizationPercent = Math.min((iface.total_mbps / 1000) * 100, 100); // Assumindo 1Gbps max
+        const updateTime = new Date(iface.last_update).toLocaleString();
+        
+        html += `
+            <tr>
+                <td><strong>${iface.name}</strong></td>
+                <td>${statusBadge}</td>
+                <td><span class="text-success">${iface.in_mbps}</span></td>
+                <td><span class="text-warning">${iface.out_mbps}</span></td>
+                <td><strong>${iface.total_mbps}</strong></td>
+                <td>
+                    <div class="bandwidth-bar">
+                        <div class="bandwidth-fill" style="width: ${utilizationPercent}%"></div>
+                    </div>
+                    <small>${utilizationPercent.toFixed(1)}%</small>
+                </td>
+                <td><small>${updateTime}</small></td>
+            </tr>
+        `;
+    });
+    
+    tbody.innerHTML = html;
+}
+
+function showError(message) {
+    const tbody = document.getElementById('trafficTableBody');
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="7" class="text-center text-danger">
+                <i class="fas fa-exclamation-triangle"></i>
+                <p class="mt-2">${message}</p>
+            </td>
+        </tr>
+    `;
+}
+</script>
+{% endblock %} 

@@ -1,0 +1,367 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard Híbrido - NE8000{% endblock %}
+
+{% block extra_css %}
+<style>
+.metric-card {
+    transition: transform 0.2s;
+}
+.metric-card:hover {
+    transform: translateY(-2px);
+}
+.status-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 8px;
+}
+.status-active { background-color: #10b981; }
+.status-inactive { background-color: #ef4444; }
+.status-warning { background-color: #f59e0b; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2><i class="fas fa-tachometer-alt"></i> Dashboard Híbrido NE8000</h2>
+            <p class="text-muted">Monitoramento em tempo real - PPPoE + Tráfego de Interfaces</p>
+        </div>
+    </div>
+
+    <!-- Status Cards -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6">
+            <div class="card metric-card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="mb-0" id="total-pppoe-users">-</h4>
+                            <p class="mb-0">Usuários PPPoE Online</p>
+                            <small id="pppoe-update-time">Atualizando...</small>
+                        </div>
+                        <div class="text-right">
+                            <i class="fas fa-users fa-2x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="card metric-card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="mb-0" id="active-interfaces">-</h4>
+                            <p class="mb-0">Interfaces Ativas</p>
+                            <small id="interfaces-update-time">Atualizando...</small>
+                        </div>
+                        <div class="text-right">
+                            <i class="fas fa-network-wired fa-2x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="card metric-card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="mb-0" id="total-traffic">-</h4>
+                            <p class="mb-0">Tráfego Total (Mbps)</p>
+                            <small id="traffic-update-time">Atualizando...</small>
+                        </div>
+                        <div class="text-right">
+                            <i class="fas fa-chart-line fa-2x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="card metric-card" id="system-status-card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="mb-0" id="system-status">-</h4>
+                            <p class="mb-0">Status do Sistema</p>
+                            <small id="system-update-time">Verificando...</small>
+                        </div>
+                        <div class="text-right">
+                            <i class="fas fa-server fa-2x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row mb-4">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-chart-area"></i> Usuários PPPoE - Últimas 2 Horas</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="pppoeChart" height="100"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-exchange-alt"></i> Tráfego de Rede - Tempo Real</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="trafficChart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Interface Details -->
+    <div class="row">
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5><i class="fas fa-list"></i> Top Interfaces PPPoE</h5>
+                    <a href="/interfaces/pppoe" class="btn btn-sm btn-primary">Ver Todas</a>
+                </div>
+                <div class="card-body">
+                    <div id="pppoe-interfaces-list">
+                        <div class="text-center py-3">
+                            <div class="spinner-border spinner-border-sm" role="status"></div>
+                            <p class="mt-2">Carregando interfaces PPPoE...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5><i class="fas fa-chart-bar"></i> Top Interfaces por Tráfego</h5>
+                    <a href="/interfaces/traffic" class="btn btn-sm btn-success">Ver Todas</a>
+                </div>
+                <div class="card-body">
+                    <div id="traffic-interfaces-list">
+                        <div class="text-center py-3">
+                            <div class="spinner-border spinner-border-sm" role="status"></div>
+                            <p class="mt-2">Carregando tráfego...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+let pppoeChart, trafficChart;
+
+// Auto-refresh a cada 30 segundos
+setInterval(loadDashboardData, 30000);
+
+// Carregar dados iniciais
+$(document).ready(function() {
+    initializeCharts();
+    loadDashboardData();
+});
+
+function initializeCharts() {
+    // PPPoE Users Chart
+    const pppoeCtx = document.getElementById('pppoeChart').getContext('2d');
+    pppoeChart = new Chart(pppoeCtx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Usuários PPPoE',
+                data: [],
+                borderColor: 'rgb(59, 130, 246)',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+
+    // Traffic Chart
+    const trafficCtx = document.getElementById('trafficChart').getContext('2d');
+    trafficChart = new Chart(trafficCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Entrada (Mbps)', 'Saída (Mbps)'],
+            datasets: [{
+                data: [0, 0],
+                backgroundColor: ['rgb(16, 185, 129)', 'rgb(245, 158, 11)']
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false
+        }
+    });
+}
+
+async function loadDashboardData() {
+    try {
+        // Carregar resumo do dashboard
+        const dashboardResponse = await fetch('/api/hybrid/dashboard');
+        const dashboardData = await dashboardResponse.json();
+        
+        if (dashboardData.success) {
+            updateDashboardCards(dashboardData.dashboard);
+        }
+
+        // Carregar dados dos gráficos
+        const chartsResponse = await fetch('/api/hybrid/charts');
+        const chartsData = await chartsResponse.json();
+        
+        if (chartsData.success) {
+            updateCharts(chartsData.charts);
+        }
+
+        // Carregar interfaces PPPoE
+        const pppoeResponse = await fetch('/api/hybrid/pppoe/interfaces');
+        const pppoeData = await pppoeResponse.json();
+        
+        if (pppoeData.success) {
+            updatePPPoEInterfaces(pppoeData.interfaces.slice(0, 10));
+        }
+
+        // Carregar tráfego de interfaces
+        const trafficResponse = await fetch('/api/hybrid/network/traffic');
+        const trafficData = await trafficResponse.json();
+        
+        if (trafficData.success) {
+            updateTrafficInterfaces(trafficData.interfaces.slice(0, 10));
+        }
+
+        // Verificar status do sistema
+        const statusResponse = await fetch('/api/hybrid/status');
+        const statusData = await statusResponse.json();
+        
+        if (statusData.success) {
+            updateSystemStatus(statusData);
+        }
+
+    } catch (error) {
+        console.error('Erro ao carregar dados do dashboard:', error);
+    }
+}
+
+function updateDashboardCards(dashboard) {
+    document.getElementById('total-pppoe-users').textContent = dashboard.pppoe.total_users;
+    document.getElementById('active-interfaces').textContent = dashboard.network.active_interfaces;
+    
+    const totalTraffic = dashboard.network.total_in_mbps + dashboard.network.total_out_mbps;
+    document.getElementById('total-traffic').textContent = totalTraffic.toFixed(1);
+    
+    const now = new Date().toLocaleTimeString();
+    document.getElementById('pppoe-update-time').textContent = `Atualizado: ${now}`;
+    document.getElementById('interfaces-update-time').textContent = `Atualizado: ${now}`;
+    document.getElementById('traffic-update-time').textContent = `Atualizado: ${now}`;
+}
+
+function updateCharts(charts) {
+    // Atualizar gráfico PPPoE
+    if (charts.pppoe_users && charts.pppoe_users.length > 0) {
+        pppoeChart.data.labels = charts.pppoe_users.map(p => new Date(p.time).toLocaleTimeString());
+        pppoeChart.data.datasets[0].data = charts.pppoe_users.map(p => p.users);
+        pppoeChart.update();
+    }
+
+    // Atualizar gráfico de tráfego
+    if (charts.network_traffic && charts.network_traffic.length > 0) {
+        const latest = charts.network_traffic[charts.network_traffic.length - 1];
+        trafficChart.data.datasets[0].data = [latest.in_mbps, latest.out_mbps];
+        trafficChart.update();
+    }
+}
+
+function updatePPPoEInterfaces(interfaces) {
+    const container = document.getElementById('pppoe-interfaces-list');
+    let html = '<div class="table-responsive"><table class="table table-sm table-hover">';
+    html += '<thead><tr><th>Interface</th><th>Usuários</th><th>Status</th></tr></thead><tbody>';
+    
+    interfaces.forEach(function(iface) {
+        const statusClass = iface.status === 'active' ? 'status-active' : 'status-inactive';
+        html += `
+            <tr>
+                <td><code>${iface.name}</code></td>
+                <td><strong>${iface.quantity}</strong></td>
+                <td><span class="status-indicator ${statusClass}"></span>${iface.status}</td>
+            </tr>
+        `;
+    });
+    
+    html += '</tbody></table></div>';
+    container.innerHTML = html;
+}
+
+function updateTrafficInterfaces(interfaces) {
+    const container = document.getElementById('traffic-interfaces-list');
+    let html = '<div class="table-responsive"><table class="table table-sm table-hover">';
+    html += '<thead><tr><th>Interface</th><th>IN (Mbps)</th><th>OUT (Mbps)</th><th>Status</th></tr></thead><tbody>';
+    
+    interfaces.forEach(function(iface) {
+        const statusClass = iface.status === 'up' ? 'status-active' : 'status-inactive';
+        html += `
+            <tr>
+                <td><code>${iface.name}</code></td>
+                <td><span class="text-success">${iface.in_mbps}</span></td>
+                <td><span class="text-warning">${iface.out_mbps}</span></td>
+                <td><span class="status-indicator ${statusClass}"></span>${iface.status}</td>
+            </tr>
+        `;
+    });
+    
+    html += '</tbody></table></div>';
+    container.innerHTML = html;
+}
+
+function updateSystemStatus(status) {
+    const statusCard = document.getElementById('system-status-card');
+    const statusElement = document.getElementById('system-status');
+    const timeElement = document.getElementById('system-update-time');
+    
+    statusElement.textContent = status.status;
+    timeElement.textContent = `Verificado: ${new Date().toLocaleTimeString()}`;
+    
+    // Atualizar cor do card baseado no status
+    statusCard.className = 'card metric-card';
+    
+    if (status.status === 'healthy') {
+        statusCard.classList.add('bg-success', 'text-white');
+    } else if (status.status === 'degraded') {
+        statusCard.classList.add('bg-warning', 'text-white');
+    } else {
+        statusCard.classList.add('bg-danger', 'text-white');
+    }
+}
+</script>
+{% endblock %} 

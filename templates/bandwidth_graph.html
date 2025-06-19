@@ -1,0 +1,301 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-6">
+    <!-- Cabeçalho -->
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <div class="flex items-center justify-between">
+            <h2 class="text-2xl font-semibold text-gray-800">📈 Gráfico de Banda</h2>
+            <div class="flex items-center space-x-4">
+                <span class="text-sm text-gray-600">Usuário:</span>
+                <span class="font-mono text-lg font-semibold text-blue-600">{{ username }}</span>
+                <button onclick="refreshBandwidth()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                    🔄 Atualizar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Métricas Atuais -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <h4 class="text-md font-semibold text-gray-800 mb-2">Velocidade Total</h4>
+            <div class="text-2xl font-bold text-blue-600" id="currentTotal">-</div>
+            <div class="text-sm text-gray-600" id="currentTotalKbyte">- kbyte/min</div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <h4 class="text-md font-semibold text-gray-800 mb-2">Download</h4>
+            <div class="text-2xl font-bold text-green-600" id="currentInbound">-</div>
+            <div class="text-sm text-gray-600" id="currentInboundKbyte">- kbyte/min</div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <h4 class="text-md font-semibold text-gray-800 mb-2">Upload</h4>
+            <div class="text-2xl font-bold text-orange-600" id="currentOutbound">-</div>
+            <div class="text-sm text-gray-600" id="currentOutboundKbyte">- kbyte/min</div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <h4 class="text-md font-semibold text-gray-800 mb-2">Status</h4>
+            <div class="text-lg font-bold" id="currentStatus">-</div>
+            <div class="text-sm text-gray-600" id="currentInterface">-</div>
+        </div>
+    </div>
+
+    <!-- Gráfico -->
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Histórico de Banda (Últimos 30 minutos)</h3>
+        <div class="relative">
+            <canvas id="bandwidthChart" width="800" height="400"></canvas>
+        </div>
+        <div class="mt-4 text-sm text-gray-600">
+            <div class="flex items-center space-x-4">
+                <div class="flex items-center">
+                    <div class="w-4 h-4 bg-blue-500 rounded mr-2"></div>
+                    <span>Total</span>
+                </div>
+                <div class="flex items-center">
+                    <div class="w-4 h-4 bg-green-500 rounded mr-2"></div>
+                    <span>Download</span>
+                </div>
+                <div class="flex items-center">
+                    <div class="w-4 h-4 bg-orange-500 rounded mr-2"></div>
+                    <span>Upload</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Informações do Usuário -->
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Informações da Sessão</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div class="flex justify-between">
+                <span class="text-gray-600">IP Address:</span>
+                <span class="font-mono" id="sessionIp">-</span>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-gray-600">Interface:</span>
+                <span class="font-mono" id="sessionInterface">-</span>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-gray-600">Última Atualização:</span>
+                <span class="font-mono" id="lastUpdate">-</span>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-gray-600">Dados em Cache:</span>
+                <span class="font-mono" id="cacheStatus">-</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+let bandwidthChart;
+let currentData = {};
+
+document.addEventListener('DOMContentLoaded', function() {
+    initChart();
+    loadBandwidthData();
+    // Auto-refresh apenas nesta página específica, a cada 30 segundos
+    // Só ativa se a página estiver visível
+    const refreshInterval = setInterval(() => {
+        if (!document.hidden) {
+            loadBandwidthData();
+        }
+    }, 30000);
+    
+    // Parar auto-refresh quando a página não estiver mais visível
+    document.addEventListener('visibilitychange', function() {
+        if (document.hidden) {
+            console.log('Página não visível, pausando auto-refresh');
+        } else {
+            console.log('Página visível, retomando auto-refresh');
+        }
+    });
+});
+
+function initChart() {
+    const ctx = document.getElementById('bandwidthChart').getContext('2d');
+    
+    bandwidthChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [
+                {
+                    label: 'Total (MB/min)',
+                    data: [],
+                    borderColor: 'rgb(59, 130, 246)',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    tension: 0.4
+                },
+                {
+                    label: 'Download (MB/min)',
+                    data: [],
+                    borderColor: 'rgb(34, 197, 94)',
+                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                    tension: 0.4
+                },
+                {
+                    label: 'Upload (MB/min)',
+                    data: [],
+                    borderColor: 'rgb(249, 115, 22)',
+                    backgroundColor: 'rgba(249, 115, 22, 0.1)',
+                    tension: 0.4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    display: true,
+                    title: {
+                        display: true,
+                        text: 'Tempo'
+                    }
+                },
+                y: {
+                    display: true,
+                    title: {
+                        display: true,
+                        text: 'Velocidade (MB/min)'
+                    },
+                    beginAtZero: true
+                }
+            },
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+}
+
+async function loadBandwidthData() {
+    try {
+        const username = '{{ username }}';
+        console.log('Carregando dados para usuário:', username);
+        
+        const response = await fetch(`/api/bandwidth_data/${username}`);
+        const data = await response.json();
+        
+        console.log('Dados recebidos da API:', data);
+        
+        if (data.success) {
+            currentData = data;
+            updateMetrics(data);
+            updateChart(data);
+            updateSessionInfo(data);
+        } else {
+            console.error('Erro ao carregar dados de banda:', data.error);
+            // Mostrar erro na interface
+            document.getElementById('currentStatus').textContent = 'ERRO';
+            document.getElementById('currentStatus').className = 'text-lg font-bold text-red-600';
+        }
+    } catch (error) {
+        console.error('Erro ao carregar dados de banda:', error);
+        // Mostrar erro na interface
+        document.getElementById('currentStatus').textContent = 'ERRO CONEXÃO';
+        document.getElementById('currentStatus').className = 'text-lg font-bold text-red-600';
+    }
+}
+
+function updateMetrics(data) {
+    console.log('Atualizando métricas com dados:', data);
+    
+    // Velocidade total - verificar diferentes campos possíveis
+    const totalMB = data.realtime_speed_mb || data.realtime_speed_MB || 0;
+    const totalKbyte = data.realtime_speed_kbyte || (totalMB * 1024) || 0;
+    
+    document.getElementById('currentTotal').textContent = `${totalMB} MB/min`;
+    document.getElementById('currentTotalKbyte').textContent = `${Math.round(totalKbyte)} kbyte/min`;
+    
+    // Download - verificar diferentes campos possíveis
+    const inboundMB = data.realtime_speed_inbound_mb || data.realtime_speed_inbound_MB || 0;
+    const inboundKbyte = data.realtime_speed_inbound_kbyte || (inboundMB * 1024) || 0;
+    
+    document.getElementById('currentInbound').textContent = `${inboundMB} MB/min`;
+    document.getElementById('currentInboundKbyte').textContent = `${Math.round(inboundKbyte)} kbyte/min`;
+    
+    // Upload - verificar diferentes campos possíveis
+    const outboundMB = data.realtime_speed_outbound_mb || data.realtime_speed_outbound_MB || 0;
+    const outboundKbyte = data.realtime_speed_outbound_kbyte || (outboundMB * 1024) || 0;
+    
+    document.getElementById('currentOutbound').textContent = `${outboundMB} MB/min`;
+    document.getElementById('currentOutboundKbyte').textContent = `${Math.round(outboundKbyte)} kbyte/min`;
+    
+    // Status - melhorar detecção
+    const statusElement = document.getElementById('currentStatus');
+    const userStatus = data.status || 'UNKNOWN';
+    
+    console.log('Status do usuário:', userStatus);
+    
+    if (userStatus === 'ONLINE') {
+        statusElement.textContent = '🟢 ONLINE';
+        statusElement.className = 'text-lg font-bold text-green-600';
+    } else if (userStatus === 'OFFLINE') {
+        statusElement.textContent = '🔴 OFFLINE';
+        statusElement.className = 'text-lg font-bold text-red-600';
+    } else {
+        statusElement.textContent = `⚪ ${userStatus}`;
+        statusElement.className = 'text-lg font-bold text-gray-600';
+    }
+    
+    // Interface - verificar diferentes campos
+    const interfaceName = data.interface || data.user_interface || '-';
+    document.getElementById('currentInterface').textContent = interfaceName;
+    
+    console.log('Status final exibido:', statusElement.textContent);
+    console.log('Interface final exibida:', interfaceName);
+}
+
+function updateChart(data) {
+    if (!data.history || !Array.isArray(data.history)) return;
+    
+    const labels = data.history.map(item => {
+        const date = new Date(item.timestamp);
+        return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    });
+    
+    const totalData = data.history.map(item => item.total_mb || 0);
+    const inboundData = data.history.map(item => item.inbound_mb || 0);
+    const outboundData = data.history.map(item => item.outbound_mb || 0);
+    
+    bandwidthChart.data.labels = labels;
+    bandwidthChart.data.datasets[0].data = totalData;
+    bandwidthChart.data.datasets[1].data = inboundData;
+    bandwidthChart.data.datasets[2].data = outboundData;
+    
+    bandwidthChart.update();
+}
+
+function updateSessionInfo(data) {
+    console.log('Atualizando informações da sessão:', data);
+    
+    // IP Address - verificar diferentes campos
+    const ipAddress = data.ip_address || data.user_ip_address || data.ipAddress || '-';
+    document.getElementById('sessionIp').textContent = ipAddress;
+    
+    // Interface - verificar diferentes campos  
+    const interfaceName = data.interface || data.user_interface || data.access_interface || '-';
+    document.getElementById('sessionInterface').textContent = interfaceName;
+    
+    // Última atualização
+    document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('pt-BR');
+    
+    // Cache status
+    const cacheStatus = data.cached ? 'Sim' : 'Não';
+    document.getElementById('cacheStatus').textContent = cacheStatus;
+    
+    console.log('Sessão - IP:', ipAddress, 'Interface:', interfaceName, 'Cache:', cacheStatus);
+}
+
+async function refreshBandwidth() {
+    await loadBandwidthData();
+}
+</script>
+{% endblock %} 
