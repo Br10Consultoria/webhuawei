@@ -285,7 +285,7 @@ Este projeto está sob a licença MIT. Veja o arquivo `LICENSE` para mais detalh
 
 ## 🙋‍♂️ Suporte
 
-- 📧 Email: seu-email@exemplo.com
+- 📧 Email: miralvosoaresjunior@gmail.com
 - 🐛 Issues: [GitHub Issues](https://github.com/seu-usuario/ne80001506/issues)
 - 📖 Wiki: [Documentação Completa](https://github.com/seu-usuario/ne80001506/wiki)
 
