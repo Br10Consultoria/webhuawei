@@ -57,6 +57,7 @@
             <div class="nav-section">Infraestrutura</div>
             <a href="/interfaces/pppoe" class="nav-item {% if '/interfaces' in request.url.path %}active{% endif %}"><i class="fas fa-ethernet"></i> Interfaces PPPoE</a>
             <div class="nav-section">Sistema</div>
+            <a href="/logs" class="nav-item {% if request.url.path == '/logs' %}active{% endif %}"><i class="fas fa-clipboard-list"></i> Logs de Acesso</a>
             <a href="/setup-2fa" class="nav-item {% if request.url.path == '/setup-2fa' %}active{% endif %}"><i class="fas fa-shield-halved"></i> Autenticacao 2FA</a>
             <a href="/health" class="nav-item" target="_blank"><i class="fas fa-heart-pulse"></i> Health Check</a>
         </nav>
@@ -90,7 +91,7 @@
 <div id="sidebarOverlay" class="hidden fixed inset-0 bg-black/50 z-30 md:hidden" onclick="toggleSidebar()"></div>
 {% else %}
 <div class="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 flex items-center justify-center p-4">
-    {% block content %}{% endblock %}
+    {% block login_content %}{% endblock %}
 </div>
 {% endif %}
 <script>

@@ -13,7 +13,18 @@ from fastapi import Request
 logger = logging.getLogger(__name__)
 
 # Caminho do arquivo de log
-LOG_DIR = os.getenv("AUDIT_LOG_DIR", "logs")
+_requested_dir = os.getenv("AUDIT_LOG_DIR", "logs")
+try:
+    os.makedirs(_requested_dir, exist_ok=True)
+    _test_file = os.path.join(_requested_dir, ".write_test")
+    with open(_test_file, "w") as _f:
+        _f.write("ok")
+    os.remove(_test_file)
+    LOG_DIR = _requested_dir
+except Exception:
+    LOG_DIR = "/tmp/ne8000_logs"
+    os.makedirs(LOG_DIR, exist_ok=True)
+    logger.warning(f"Sem permissao em {_requested_dir}, usando {LOG_DIR}")
 LOG_FILE = os.path.join(LOG_DIR, "audit.jsonl")
 
 # Buffer em memória (últimos 500 eventos)
