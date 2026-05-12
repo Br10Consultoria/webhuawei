@@ -2,70 +2,89 @@
 {% block title %}Dashboard — NE8000 Manager{% endblock %}
 {% block page_title %}Dashboard{% endblock %}
 {% block content %}
-<!-- Stats row -->
-<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-    <div class="card p-5">
-        <div class="flex items-center justify-between mb-3">
-            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Usuarios Online</span>
-            <div class="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center">
-                <i class="fas fa-users text-blue-600 text-sm"></i>
+
+<!-- Stats row — 4 cards compactos -->
+<div class="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-5">
+    <div class="card p-4">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Usuários Online</span>
+            <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                <i class="fas fa-users text-blue-600 text-xs"></i>
             </div>
         </div>
-        <div class="text-3xl font-extrabold text-slate-800" id="totalOnline">—</div>
-        <div class="text-xs text-slate-400 mt-1">PPPoE ativos no BNG</div>
+        <div class="text-2xl font-extrabold text-slate-800" id="totalOnline">—</div>
+        <div class="text-xs text-slate-400 mt-0.5">PPPoE ativos no BNG</div>
     </div>
-    <div class="card p-5">
-        <div class="flex items-center justify-between mb-3">
-            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Conexao</span>
-            <div class="w-9 h-9 bg-green-100 rounded-lg flex items-center justify-center">
-                <i class="fas fa-plug text-green-600 text-sm"></i>
+    <div class="card p-4">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Conexão</span>
+            <div class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                <i class="fas fa-plug text-green-600 text-xs"></i>
             </div>
         </div>
-        <div class="text-xl font-bold text-slate-800" id="connStatus">—</div>
-        <div class="text-xs text-slate-400 mt-1" id="connHost">Verificando...</div>
+        <div class="text-base font-bold" id="connStatus" style="color:#94a3b8">—</div>
+        <div class="text-xs text-slate-400 mt-0.5" id="connHost">Verificando...</div>
     </div>
-    <div class="card p-5">
-        <div class="flex items-center justify-between mb-3">
+    <div class="card p-4">
+        <div class="flex items-center justify-between mb-2">
             <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Protocolo</span>
-            <div class="w-9 h-9 bg-purple-100 rounded-lg flex items-center justify-center">
-                <i class="fas fa-terminal text-purple-600 text-sm"></i>
+            <div class="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                <i class="fas fa-terminal text-purple-600 text-xs"></i>
             </div>
         </div>
-        <div class="text-xl font-bold text-slate-800 uppercase" id="connProto">—</div>
-        <div class="text-xs text-slate-400 mt-1">SSH ou Telnet</div>
+        <div class="text-base font-bold text-slate-800 uppercase" id="connProto">—</div>
+        <div class="text-xs text-slate-400 mt-0.5">SSH ou Telnet</div>
     </div>
-    <div class="card p-5">
-        <div class="flex items-center justify-between mb-3">
-            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Ultima Atualizacao</span>
-            <div class="w-9 h-9 bg-amber-100 rounded-lg flex items-center justify-center">
-                <i class="fas fa-clock text-amber-600 text-sm"></i>
+    <div class="card p-4">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Última Atualização</span>
+            <div class="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
+                <i class="fas fa-clock text-amber-600 text-xs"></i>
             </div>
         </div>
         <div class="text-sm font-bold text-slate-800" id="lastUpdate">—</div>
-        <div class="text-xs text-slate-400 mt-1">Atualiza a cada 60s</div>
+        <div class="text-xs text-slate-400 mt-0.5">Atualiza a cada 60s</div>
     </div>
 </div>
 
-<!-- Quick actions -->
-<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-    <div class="card p-5">
-        <h3 class="section-title mb-3">Acoes Rapidas</h3>
-        <div class="space-y-2">
-            <a href="/pppoe" class="flex items-center gap-3 p-3 rounded-lg bg-slate-50 hover:bg-blue-50 hover:text-blue-700 transition text-sm font-medium text-slate-700 border border-transparent hover:border-blue-200">
-                <i class="fas fa-search w-4 text-center"></i> Consultar usuario PPPoE
+<!-- IP Pool Usage -->
+<div class="card p-4 mb-5">
+    <div class="flex items-center justify-between mb-3">
+        <h3 class="section-title">Uso de Pools de IP</h3>
+        <button onclick="loadIpPool()" class="text-xs text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1">
+            <i class="fas fa-rotate-right text-xs"></i> Atualizar
+        </button>
+    </div>
+    <div id="ipPoolContent">
+        <div class="text-xs text-slate-400 flex items-center gap-2">
+            <i class="fas fa-spinner fa-spin"></i> Carregando pools...
+        </div>
+    </div>
+    <div class="mt-2 text-xs text-slate-400 font-mono" id="ipPoolCmd" style="display:none">
+        <i class="fas fa-terminal mr-1"></i>display ip-pool pool-usage
+    </div>
+</div>
+
+<!-- Quick actions + Status -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div class="card p-4">
+        <h3 class="section-title mb-3">Ações Rápidas</h3>
+        <div class="space-y-1.5">
+            <a href="/pppoe" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 hover:bg-blue-50 hover:text-blue-700 transition text-sm font-medium text-slate-700 border border-transparent hover:border-blue-200">
+                <i class="fas fa-search w-4 text-center text-xs"></i> Consultar usuário PPPoE
             </a>
-            <a href="/interfaces/pppoe" class="flex items-center gap-3 p-3 rounded-lg bg-slate-50 hover:bg-blue-50 hover:text-blue-700 transition text-sm font-medium text-slate-700 border border-transparent hover:border-blue-200">
-                <i class="fas fa-ethernet w-4 text-center"></i> Ver interfaces PPPoE
+            <a href="/interfaces/pppoe" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 hover:bg-blue-50 hover:text-blue-700 transition text-sm font-medium text-slate-700 border border-transparent hover:border-blue-200">
+                <i class="fas fa-ethernet w-4 text-center text-xs"></i> Ver interfaces PPPoE
             </a>
-            <button onclick="forceRefresh()" class="w-full flex items-center gap-3 p-3 rounded-lg bg-slate-50 hover:bg-amber-50 hover:text-amber-700 transition text-sm font-medium text-slate-700 border border-transparent hover:border-amber-200">
-                <i class="fas fa-rotate-right w-4 text-center"></i> Forcar atualizacao do cache
+            <button onclick="forceRefresh()" class="w-full flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 hover:bg-amber-50 hover:text-amber-700 transition text-sm font-medium text-slate-700 border border-transparent hover:border-amber-200">
+                <i class="fas fa-rotate-right w-4 text-center text-xs"></i> Forçar atualização do cache
             </button>
         </div>
     </div>
-    <div class="card p-5">
+    <div class="card p-4">
         <h3 class="section-title mb-3">Status do Sistema</h3>
-        <div id="healthInfo" class="space-y-2 text-sm text-slate-600">
-            <div class="flex items-center gap-2"><i class="fas fa-spinner fa-spin text-slate-400"></i> Carregando...</div>
+        <div id="healthInfo" class="space-y-1.5 text-sm text-slate-600">
+            <div class="flex items-center gap-2 text-xs"><i class="fas fa-spinner fa-spin text-slate-400"></i> Carregando...</div>
         </div>
     </div>
 </div>
@@ -78,14 +97,15 @@ async function loadDashboard() {
             fetch('/api/online_total')
         ]);
         const status = await statusRes.json();
-        const total = await totalRes.json();
+        const total  = await totalRes.json();
 
-        document.getElementById('connStatus').textContent = status.connected ? 'Conectado' : 'Desconectado';
-        document.getElementById('connStatus').style.color = status.connected ? '#16a34a' : '#dc2626';
-        document.getElementById('connHost').textContent = status.host || '—';
+        const connEl = document.getElementById('connStatus');
+        connEl.textContent  = status.connected ? 'Conectado' : 'Desconectado';
+        connEl.style.color  = status.connected ? '#16a34a' : '#dc2626';
+        document.getElementById('connHost').textContent  = status.host || '—';
         document.getElementById('connProto').textContent = (status.protocol || 'SSH').toUpperCase();
         document.getElementById('totalOnline').textContent = total.total ?? total.active ?? '—';
-        document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('pt-BR');
+        document.getElementById('lastUpdate').textContent  = new Date().toLocaleTimeString('pt-BR');
     } catch(e) {
         document.getElementById('connStatus').textContent = 'Erro';
     }
@@ -97,25 +117,113 @@ async function loadHealth() {
         const d = await r.json();
         const el = document.getElementById('healthInfo');
         const items = [
-            {icon: d.ssh_connected ? 'fa-check text-green-500' : 'fa-xmark text-red-500', label: 'Conexao SSH/Telnet', val: d.ssh_connected ? 'OK' : 'Falha'},
+            {icon: d.ssh_connected ? 'fa-check text-green-500' : 'fa-xmark text-red-500', label: 'Conexão SSH/Telnet', val: d.ssh_connected ? 'OK' : 'Falha'},
             {icon: 'fa-database text-blue-500', label: 'Itens em cache', val: d.cache_active_items ?? '—'},
-            {icon: 'fa-code-branch text-purple-500', label: 'Versao', val: d.version ?? '—'},
+            {icon: 'fa-code-branch text-purple-500', label: 'Versão', val: d.version ?? '—'},
         ];
-        el.innerHTML = items.map(i => `<div class="flex items-center justify-between py-1 border-b border-slate-100 last:border-0"><span class="flex items-center gap-2"><i class="fas ${i.icon} w-4"></i>${i.label}</span><span class="font-semibold text-slate-800">${i.val}</span></div>`).join('');
+        el.innerHTML = items.map(i =>
+            `<div class="flex items-center justify-between py-1 border-b border-slate-100 last:border-0 text-xs">
+                <span class="flex items-center gap-2"><i class="fas ${i.icon} w-4"></i>${i.label}</span>
+                <span class="font-semibold text-slate-800">${i.val}</span>
+            </div>`
+        ).join('');
     } catch(e) {}
+}
+
+async function loadIpPool() {
+    const el = document.getElementById('ipPoolContent');
+    el.innerHTML = '<div class="text-xs text-slate-400 flex items-center gap-2"><i class="fas fa-spinner fa-spin"></i> Consultando roteador...</div>';
+    document.getElementById('ipPoolCmd').style.display = 'none';
+    try {
+        const r = await fetch('/api/ip_pool_usage');
+        const d = await r.json();
+        document.getElementById('ipPoolCmd').style.display = '';
+
+        if (!d.success) {
+            el.innerHTML = `<div class="text-xs text-red-500"><i class="fas fa-xmark mr-1"></i>${d.error}</div>`;
+            return;
+        }
+
+        if (!d.pools || d.pools.length === 0) {
+            el.innerHTML = '<div class="text-xs text-slate-400">Nenhum pool com endereços configurado.</div>';
+            return;
+        }
+
+        // Tabela de pools
+        let html = `<div class="overflow-x-auto">
+            <table class="w-full text-xs">
+                <thead>
+                    <tr class="border-b border-slate-100">
+                        <th class="text-left py-1.5 pr-4 font-semibold text-slate-500 uppercase tracking-wide">Domínio</th>
+                        <th class="text-right py-1.5 pr-4 font-semibold text-slate-500 uppercase tracking-wide">Total</th>
+                        <th class="text-right py-1.5 pr-4 font-semibold text-slate-500 uppercase tracking-wide">Usados</th>
+                        <th class="text-right py-1.5 pr-4 font-semibold text-slate-500 uppercase tracking-wide">Livres</th>
+                        <th class="text-left py-1.5 font-semibold text-slate-500 uppercase tracking-wide">Uso</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-50">`;
+
+        d.pools.forEach(p => {
+            const ratio = p.ratio || 0;
+            const barColor = ratio >= 90 ? 'bg-red-500' : ratio >= 75 ? 'bg-amber-500' : 'bg-green-500';
+            const textColor = ratio >= 90 ? 'text-red-600' : ratio >= 75 ? 'text-amber-600' : 'text-green-600';
+            html += `<tr class="hover:bg-slate-50">
+                <td class="py-1.5 pr-4 font-mono font-semibold text-slate-700">${p.domain}</td>
+                <td class="py-1.5 pr-4 text-right text-slate-600">${p.pool_len.toLocaleString('pt-BR')}</td>
+                <td class="py-1.5 pr-4 text-right font-semibold text-slate-800">${p.used.toLocaleString('pt-BR')}</td>
+                <td class="py-1.5 pr-4 text-right text-slate-500">${p.free.toLocaleString('pt-BR')}</td>
+                <td class="py-1.5 min-w-[120px]">
+                    <div class="flex items-center gap-2">
+                        <div class="flex-1 bg-slate-100 rounded-full h-1.5">
+                            <div class="${barColor} h-1.5 rounded-full transition-all" style="width:${Math.min(ratio,100)}%"></div>
+                        </div>
+                        <span class="font-bold ${textColor} w-8 text-right">${ratio}%</span>
+                    </div>
+                </td>
+            </tr>`;
+        });
+
+        // Linha de total
+        if (d.total) {
+            const tr = d.total.ratio || 0;
+            const trColor = tr >= 90 ? 'text-red-600' : tr >= 75 ? 'text-amber-600' : 'text-green-600';
+            const barColor = tr >= 90 ? 'bg-red-500' : tr >= 75 ? 'bg-amber-500' : 'bg-green-500';
+            html += `<tr class="border-t-2 border-slate-200 bg-slate-50 font-bold">
+                <td class="py-1.5 pr-4 text-slate-700">Total</td>
+                <td class="py-1.5 pr-4 text-right text-slate-700">${d.total.pool_len.toLocaleString('pt-BR')}</td>
+                <td class="py-1.5 pr-4 text-right text-slate-800">${d.total.used.toLocaleString('pt-BR')}</td>
+                <td class="py-1.5 pr-4 text-right text-slate-600">${(d.total.pool_len - d.total.used).toLocaleString('pt-BR')}</td>
+                <td class="py-1.5">
+                    <div class="flex items-center gap-2">
+                        <div class="flex-1 bg-slate-200 rounded-full h-1.5">
+                            <div class="${barColor} h-1.5 rounded-full" style="width:${Math.min(tr,100)}%"></div>
+                        </div>
+                        <span class="font-bold ${trColor} w-8 text-right">${tr}%</span>
+                    </div>
+                </td>
+            </tr>`;
+        }
+
+        html += '</tbody></table></div>';
+        el.innerHTML = html;
+    } catch(e) {
+        el.innerHTML = `<div class="text-xs text-red-500"><i class="fas fa-xmark mr-1"></i>Erro: ${e.message}</div>`;
+    }
 }
 
 async function forceRefresh() {
     try {
         const r = await fetch('/api/force_cache_refresh', {method:'POST'});
         const d = await r.json();
-        showMessage(d.success ? 'Cache limpo! Proxima consulta sera em tempo real.' : 'Erro: ' + d.error, d.success ? 'success' : 'error');
+        showMessage(d.success ? 'Cache limpo! Próxima consulta será em tempo real.' : 'Erro: ' + d.error, d.success ? 'success' : 'error');
         if (d.success) loadDashboard();
-    } catch(e) { showMessage('Erro ao forcar refresh', 'error'); }
+    } catch(e) { showMessage('Erro ao forçar refresh', 'error'); }
 }
 
 loadDashboard();
 loadHealth();
+loadIpPool();
 setInterval(loadDashboard, 60000);
+setInterval(loadIpPool, 120000);
 </script>
 {% endblock %}

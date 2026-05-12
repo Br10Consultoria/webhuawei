@@ -609,17 +609,20 @@ async def pppoe_users_by_interface(slot: int = 0, interface: str = ""):
 
 async def discover_physical_interfaces(slot: int = 0):
     """
-    Descobre automaticamente as interfaces físicas GigabitEthernet do NE8000 via SSH.
-    Usa o comando: display interface brief | include GE
-    Retorna lista de interfaces com nome, status e contagem de usuários PPPoE.
+    Descobre automaticamente as interfaces GigabitEthernet do NE8000 via SSH.
+    Usa o comando: display interface brief | include GigabitEthernet
+    Parseia o formato real do NE8000:
+      GigabitEthernet0/1/5(10G)      up    up    23.61%  2.21%  0  0
+      GigabitEthernet0/1/6.1201(10G) up    up     0.01%  0.39%  0  0
+    Retorna interfaces fisicas e subinterfaces com contagem PPPoE.
     """
     try:
         ssh_conn = get_ssh_connection()
         if not ssh_conn.connected:
-            return {"success": False, "error": "Sem conexão SSH com o roteador", "interfaces": []}
+            return {"success": False, "error": "Sem conexao SSH com o roteador", "interfaces": []}
 
-        # Descobrir interfaces físicas GE
-        cmd_brief = "display interface brief | include GE"
+        # Comando correto para o NE8000
+        cmd_brief = "display interface brief | include GigabitEthernet"
         logger.info(f"Descobrindo interfaces: {cmd_brief}")
         output = ssh_conn.execute_command(cmd_brief)
 
@@ -631,46 +634,76 @@ async def discover_physical_interfaces(slot: int = 0):
             line = line.strip()
             if not line:
                 continue
-            # Captura nomes como GigabitEthernet0/1/0 ou GE0/1/0
-            m = re.match(r"^(GigabitEthernet\d+/\d+/\d+|GE\d+/\d+/\d+)\s+(\S+)\s+(\S+)", line)
-            if m:
-                raw_name = m.group(1)
-                phy_status = m.group(2)
-                proto_status = m.group(3)
-                # Normalizar para formato curto GE0/1/X
-                short_name = re.sub(r"GigabitEthernet", "GE", raw_name)
-                if short_name not in seen:
-                    seen.add(short_name)
-                    interfaces_found.append({
-                        "name": short_name,
-                        "full_name": raw_name,
-                        "phy_status": phy_status,
-                        "proto_status": proto_status,
-                    })
+            # Formato NE8000: GigabitEthernet0/1/5(10G)   up    up   23.61%  2.21%  0  0
+            # ou subinterface: GigabitEthernet0/1/6.1201(10G) up    up  0.01%  0.39%  0  0
+            # Captura: nome base, subinterface opcional, sufixo opcional (10G), phy_status, proto_status
+            m = re.match(
+                r"^(GigabitEthernet(\d+/\d+/\d+)(\.\d+)?)(\(\S+\))?\s+(\*?\^?\S+)\s+(\S+)",
+                line
+            )
+            if not m:
+                continue
+
+            base_num     = m.group(2)          # ex: 0/1/5
+            subif        = m.group(3)          # ex: .1201 ou None
+            phy_status   = m.group(5).lstrip("*^")  # remover marcadores *down ^down
+            proto_status = m.group(6)
+
+            if subif:
+                key        = f"GigabitEthernet{base_num}{subif}"
+                short_name = f"GE{base_num}{subif}"
+                is_subif   = True
+            else:
+                key        = f"GigabitEthernet{base_num}"
+                short_name = f"GE{base_num}"
+                is_subif   = False
+
+            if key not in seen:
+                seen.add(key)
+                interfaces_found.append({
+                    "name":         short_name,
+                    "full_name":    key,
+                    "phy_status":   phy_status,
+                    "proto_status": proto_status,
+                    "is_subif":     is_subif,
+                    "base":         f"GE{base_num}",
+                    "subif":        subif.lstrip(".") if subif else None,
+                })
 
         if not interfaces_found:
-            # Fallback: tentar display ip interface brief | include GE
-            cmd2 = "display ip interface brief | include GE"
+            # Fallback: display ip interface brief | include GigabitEthernet
+            cmd2 = "display ip interface brief | include GigabitEthernet"
             output2 = ssh_conn.execute_command(cmd2)
             for line in output2.splitlines():
-                m = re.match(r"^(GigabitEthernet\d+/\d+/\d+|GE\d+/\d+/\d+)", line.strip())
+                m = re.match(r"^(GigabitEthernet(\d+/\d+/\d+)(\.\d+)?)", line.strip())
                 if m:
-                    raw_name = m.group(1)
-                    short_name = re.sub(r"GigabitEthernet", "GE", raw_name)
-                    if short_name not in seen:
-                        seen.add(short_name)
+                    base_num = m.group(2)
+                    subif    = m.group(3)
+                    if subif:
+                        key        = f"GigabitEthernet{base_num}{subif}"
+                        short_name = f"GE{base_num}{subif}"
+                        is_subif   = True
+                    else:
+                        key        = f"GigabitEthernet{base_num}"
+                        short_name = f"GE{base_num}"
+                        is_subif   = False
+                    if key not in seen:
+                        seen.add(key)
                         interfaces_found.append({
-                            "name": short_name,
-                            "full_name": raw_name,
-                            "phy_status": "unknown",
+                            "name":         short_name,
+                            "full_name":    key,
+                            "phy_status":   "unknown",
                             "proto_status": "unknown",
+                            "is_subif":     is_subif,
+                            "base":         f"GE{base_num}",
+                            "subif":        subif.lstrip(".") if subif else None,
                         })
 
-        # Para cada interface física, contar usuários PPPoE
+        # Para cada interface, contar usuarios PPPoE usando o nome completo GigabitEthernet
         result_interfaces = []
         for iface in interfaces_found:
-            name = iface["name"]
-            cmd_count = f"display access-user slot {slot} | include {name} | exclude PPPoE | count"
+            full_name = iface["full_name"]  # ex: GigabitEthernet0/1/5 ou GigabitEthernet0/1/6.1201
+            cmd_count = f"display access-user slot {slot} | include {full_name} | exclude PPPoE | count"
             count_output = ssh_conn.execute_command(cmd_count)
             count = 0
             mc = re.search(r"(\d+)\s+(?:user|record|line)", count_output, re.IGNORECASE)
@@ -681,28 +714,102 @@ async def discover_physical_interfaces(slot: int = 0):
             if mc:
                 count = int(mc.group(1))
             result_interfaces.append({
-                "name": name,
-                "full_name": iface["full_name"],
-                "phy_status": iface["phy_status"],
+                "name":         iface["name"],
+                "full_name":    full_name,
+                "phy_status":   iface["phy_status"],
                 "proto_status": iface["proto_status"],
-                "pppoe_count": count,
-                "slot": slot,
+                "is_subif":     iface["is_subif"],
+                "base":         iface["base"],
+                "subif":        iface["subif"],
+                "pppoe_count":  count,
+                "slot":         slot,
             })
 
-        # Ordenar por nome
-        result_interfaces.sort(key=lambda x: x["name"])
+        # Ordenar: interfaces fisicas primeiro, depois subinterfaces, por nome
+        result_interfaces.sort(key=lambda x: (x["base"], x["is_subif"], x["subif"] or ""))
         total_users = sum(i["pppoe_count"] for i in result_interfaces)
 
-        logger.info(f"✅ Descoberta: {len(result_interfaces)} interfaces, {total_users} usuários PPPoE")
+        logger.info(f"Descoberta: {len(result_interfaces)} interfaces, {total_users} usuarios PPPoE")
         return {
-            "success": True,
-            "interfaces": result_interfaces,
+            "success":          True,
+            "interfaces":       result_interfaces,
             "total_interfaces": len(result_interfaces),
-            "total_users": total_users,
-            "slot": slot,
-            "timestamp": datetime.now().isoformat()
+            "total_users":      total_users,
+            "slot":             slot,
+            "command":          cmd_brief,
+            "timestamp":        datetime.now().isoformat()
         }
 
     except Exception as e:
         logger.error(f"Erro na descoberta de interfaces: {e}")
         return {"success": False, "error": str(e), "interfaces": [], "total_interfaces": 0, "total_users": 0}
+
+
+async def get_ip_pool_usage():
+    """
+    Executa 'display ip-pool pool-usage' no NE8000 e retorna os dados de uso de pool de IPs.
+    Formato esperado:
+      Domain name              PoolLen       Used  Ratio
+      default1                    2042       1698    83%
+      Total statistics            2042       1698    83%
+    """
+    try:
+        ssh_conn = get_ssh_connection()
+        if not ssh_conn.connected:
+            return {"success": False, "error": "Sem conexao SSH", "pools": [], "total": None}
+
+        cmd = "display ip-pool pool-usage"
+        logger.info(f"Executando: {cmd}")
+        output = ssh_conn.execute_command(cmd)
+
+        import re
+        pools = []
+        total = None
+
+        for line in output.splitlines():
+            line = line.strip()
+            if not line or line.startswith("-") or line.startswith("Domain"):
+                continue
+            # Linha de total: "Total statistics   2042   1698   83%"
+            m_total = re.match(
+                r"Total\s+statistics\s+(\d+)\s+(\d+)\s+(\d+%?)",
+                line, re.IGNORECASE
+            )
+            if m_total:
+                total = {
+                    "pool_len": int(m_total.group(1)),
+                    "used":     int(m_total.group(2)),
+                    "ratio":    m_total.group(3).rstrip("%"),
+                }
+                continue
+            # Linha de pool: "default1   2042   1698   83%"
+            m_pool = re.match(
+                r"^(\S+)\s+(\d+)\s+(\d+)\s+(\d+%?)",
+                line
+            )
+            if m_pool:
+                pool_len = int(m_pool.group(2))
+                used     = int(m_pool.group(3))
+                ratio    = m_pool.group(4).rstrip("%")
+                # Ignorar pools com tamanho 0
+                if pool_len == 0:
+                    continue
+                pools.append({
+                    "domain":   m_pool.group(1),
+                    "pool_len": pool_len,
+                    "used":     used,
+                    "free":     pool_len - used,
+                    "ratio":    int(ratio) if ratio.isdigit() else 0,
+                })
+
+        return {
+            "success":   True,
+            "pools":     pools,
+            "total":     total,
+            "raw_output": output,
+            "timestamp": datetime.now().isoformat()
+        }
+
+    except Exception as e:
+        logger.error(f"Erro ao obter ip-pool usage: {e}")
+        return {"success": False, "error": str(e), "pools": [], "total": None}

@@ -20,7 +20,8 @@ from modules import audit_log as _audit_log
 from modules.api_routes import (
     get_online_total, pppoe_query, pppoe_disconnect,
     get_connection_status, reconnect, bandwidth_data, pppoe_history, pppoe_by_interface,
-    pppoe_interfaces_real, pppoe_users_by_interface, discover_physical_interfaces
+    pppoe_interfaces_real, pppoe_users_by_interface, discover_physical_interfaces,
+    get_ip_pool_usage
 )
 
 # Importar módulos híbridos (novos)
@@ -199,6 +200,11 @@ async def route_pppoe_users_by_interface(slot: int = 0, interface: str = ""):
 async def route_discover_interfaces(slot: int = 0):
     """API: Descoberta automatica de interfaces fisicas GE com contagem PPPoE"""
     return await discover_physical_interfaces(slot=slot)
+
+@app.get("/api/ip_pool_usage")
+async def route_ip_pool_usage():
+    """API: Uso de pools de IP (display ip-pool pool-usage)"""
+    return await get_ip_pool_usage()
 
 # ============================================================================
 # ROTAS API (JSON) - SISTEMA HÍBRIDOO

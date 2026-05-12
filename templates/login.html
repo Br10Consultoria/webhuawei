@@ -1,66 +1,67 @@
 {% extends "base.html" %}
 {% block title %}Login — NE8000 Manager{% endblock %}
 {% block login_content %}
-<div class="w-full max-w-md">
-    <div class="bg-white rounded-2xl shadow-2xl overflow-hidden">
-        <div class="bg-gradient-to-r from-blue-700 to-blue-900 px-8 py-8 text-center">
-            <div class="w-16 h-16 bg-white/10 rounded-2xl mx-auto flex items-center justify-center mb-4">
-                <i class="fas fa-network-wired text-white text-2xl"></i>
+<div class="w-full max-w-xs">
+    <div class="bg-white rounded-xl shadow-xl overflow-hidden">
+        <!-- Header compacto -->
+        <div class="bg-gradient-to-r from-blue-700 to-blue-900 px-5 py-4 text-center">
+            <div class="w-10 h-10 bg-white/10 rounded-xl mx-auto flex items-center justify-center mb-2">
+                <i class="fas fa-network-wired text-white text-base"></i>
             </div>
-            <h1 class="text-white text-xl font-bold">NE8000 Network Manager</h1>
-            <p class="text-blue-200 text-sm mt-1">Huawei BNG — Painel de Gerenciamento</p>
+            <h1 class="text-white text-sm font-bold leading-tight">NE8000 Network Manager</h1>
+            <p class="text-blue-200 text-xs mt-0.5">Huawei BNG — Gerenciamento</p>
         </div>
-        <div class="px-8 py-7">
+        <!-- Formulário compacto -->
+        <div class="px-5 py-4">
             {% if error %}
-            <div class="mb-5 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700 text-sm">
-                <i class="fas fa-circle-xmark flex-shrink-0"></i><span>{{ error }}</span>
+            <div class="mb-3 p-2 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700 text-xs">
+                <i class="fas fa-circle-xmark flex-shrink-0 text-xs"></i><span>{{ error }}</span>
             </div>
             {% endif %}
-            <form method="POST" action="/login" id="loginForm" class="space-y-4">
+            <form method="POST" action="/login" id="loginForm" class="space-y-3">
                 <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Usuario</label>
+                    <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wide">Usuário</label>
                     <div class="relative">
-                        <i class="fas fa-user absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                        <i class="fas fa-user absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
                         <input type="text" name="username" id="username" required autocomplete="username"
                                value="{% if prefill_user %}{{ prefill_user }}{% endif %}"
-                               class="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition"
-                               placeholder="Digite seu usuario">
+                               class="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition"
+                               placeholder="Digite seu usuário">
                     </div>
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Senha</label>
+                    <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wide">Senha</label>
                     <div class="relative">
-                        <i class="fas fa-lock absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                        <i class="fas fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
                         <input type="password" name="password" id="password" required autocomplete="current-password"
-                               class="w-full pl-10 pr-10 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition"
+                               class="w-full pl-8 pr-8 py-2 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition"
                                placeholder="Digite sua senha">
-                        <button type="button" onclick="togglePwd()" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                            <i class="fas fa-eye text-sm" id="eyeIcon"></i>
+                        <button type="button" onclick="togglePwd()" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                            <i class="fas fa-eye text-xs" id="eyeIcon"></i>
                         </button>
                     </div>
                 </div>
                 {% if totp_enabled %}
                 <div id="totpSection" {% if not show_totp %}class="hidden"{% endif %}>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
-                        <i class="fas fa-shield-halved text-blue-500 mr-1"></i>Codigo 2FA
+                    <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wide">
+                        <i class="fas fa-shield-halved text-blue-500 mr-1"></i>Código 2FA
                     </label>
                     <div class="relative">
-                        <i class="fas fa-key absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                        <i class="fas fa-key absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
                         <input type="text" name="totp_token" id="totp_token"
                                inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"
-                               class="w-full pl-10 pr-4 py-2.5 border border-blue-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition font-mono tracking-widest text-center text-lg"
+                               class="w-full pl-8 pr-3 py-2 border border-blue-200 rounded-lg text-xs focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition font-mono tracking-widest text-center"
                                placeholder="000000">
                     </div>
-                    <p class="text-xs text-slate-500 mt-1.5">Abra o Google Authenticator / Authy e insira o codigo de 6 digitos.</p>
                 </div>
                 {% endif %}
-                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg font-semibold text-sm transition flex items-center justify-center gap-2 mt-1">
-                    <i class="fas fa-right-to-bracket"></i> Entrar
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-semibold text-xs transition flex items-center justify-center gap-2">
+                    <i class="fas fa-right-to-bracket text-xs"></i> Entrar
                 </button>
             </form>
-            <div class="mt-5 pt-4 border-t border-slate-100 text-center space-y-1">
-                <p class="text-xs text-slate-400"><i class="fas fa-lock text-slate-300 mr-1"></i>Acesso restrito — credenciais via variaveis de ambiente</p>
-                {% if totp_enabled %}<p class="text-xs text-blue-500"><i class="fas fa-shield-halved mr-1"></i>Autenticacao de dois fatores ativada</p>{% endif %}
+            <div class="mt-3 pt-3 border-t border-slate-100 text-center">
+                <p class="text-xs text-slate-400"><i class="fas fa-lock text-slate-300 mr-1"></i>Acesso restrito</p>
+                {% if totp_enabled %}<p class="text-xs text-blue-500 mt-0.5"><i class="fas fa-shield-halved mr-1"></i>2FA ativado</p>{% endif %}
             </div>
         </div>
     </div>
@@ -90,8 +91,8 @@ document.addEventListener('DOMContentLoaded', function() {
 function togglePwd() {
     const p = document.getElementById('password'), i = document.getElementById('eyeIcon');
     if (!p) return;
-    if (p.type === 'password') { p.type = 'text'; i.className = 'fas fa-eye-slash text-sm'; }
-    else { p.type = 'password'; i.className = 'fas fa-eye text-sm'; }
+    if (p.type === 'password') { p.type = 'text'; i.className = 'fas fa-eye-slash text-xs'; }
+    else { p.type = 'password'; i.className = 'fas fa-eye text-xs'; }
 }
 </script>
 {% endblock %}
