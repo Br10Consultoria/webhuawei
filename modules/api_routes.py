@@ -605,3 +605,104 @@ async def pppoe_users_by_interface(slot: int = 0, interface: str = ""):
     except Exception as e:
         logger.error(f"Erro ao listar usuários por interface: {e}")
         return {"success": False, "error": str(e), "users": [], "count": 0}
+
+
+async def discover_physical_interfaces(slot: int = 0):
+    """
+    Descobre automaticamente as interfaces físicas GigabitEthernet do NE8000 via SSH.
+    Usa o comando: display interface brief | include GE
+    Retorna lista de interfaces com nome, status e contagem de usuários PPPoE.
+    """
+    try:
+        ssh_conn = get_ssh_connection()
+        if not ssh_conn.connected:
+            return {"success": False, "error": "Sem conexão SSH com o roteador", "interfaces": []}
+
+        # Descobrir interfaces físicas GE
+        cmd_brief = "display interface brief | include GE"
+        logger.info(f"Descobrindo interfaces: {cmd_brief}")
+        output = ssh_conn.execute_command(cmd_brief)
+
+        import re
+        interfaces_found = []
+        seen = set()
+
+        for line in output.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            # Captura nomes como GigabitEthernet0/1/0 ou GE0/1/0
+            m = re.match(r"^(GigabitEthernet\d+/\d+/\d+|GE\d+/\d+/\d+)\s+(\S+)\s+(\S+)", line)
+            if m:
+                raw_name = m.group(1)
+                phy_status = m.group(2)
+                proto_status = m.group(3)
+                # Normalizar para formato curto GE0/1/X
+                short_name = re.sub(r"GigabitEthernet", "GE", raw_name)
+                if short_name not in seen:
+                    seen.add(short_name)
+                    interfaces_found.append({
+                        "name": short_name,
+                        "full_name": raw_name,
+                        "phy_status": phy_status,
+                        "proto_status": proto_status,
+                    })
+
+        if not interfaces_found:
+            # Fallback: tentar display ip interface brief | include GE
+            cmd2 = "display ip interface brief | include GE"
+            output2 = ssh_conn.execute_command(cmd2)
+            for line in output2.splitlines():
+                m = re.match(r"^(GigabitEthernet\d+/\d+/\d+|GE\d+/\d+/\d+)", line.strip())
+                if m:
+                    raw_name = m.group(1)
+                    short_name = re.sub(r"GigabitEthernet", "GE", raw_name)
+                    if short_name not in seen:
+                        seen.add(short_name)
+                        interfaces_found.append({
+                            "name": short_name,
+                            "full_name": raw_name,
+                            "phy_status": "unknown",
+                            "proto_status": "unknown",
+                        })
+
+        # Para cada interface física, contar usuários PPPoE
+        result_interfaces = []
+        for iface in interfaces_found:
+            name = iface["name"]
+            cmd_count = f"display access-user slot {slot} | include {name} | exclude PPPoE | count"
+            count_output = ssh_conn.execute_command(cmd_count)
+            count = 0
+            mc = re.search(r"(\d+)\s+(?:user|record|line)", count_output, re.IGNORECASE)
+            if not mc:
+                mc = re.search(r"Total\s*[:\s]+(\d+)", count_output, re.IGNORECASE)
+            if not mc:
+                mc = re.search(r"^\s*(\d+)\s*$", count_output.strip(), re.MULTILINE)
+            if mc:
+                count = int(mc.group(1))
+            result_interfaces.append({
+                "name": name,
+                "full_name": iface["full_name"],
+                "phy_status": iface["phy_status"],
+                "proto_status": iface["proto_status"],
+                "pppoe_count": count,
+                "slot": slot,
+            })
+
+        # Ordenar por nome
+        result_interfaces.sort(key=lambda x: x["name"])
+        total_users = sum(i["pppoe_count"] for i in result_interfaces)
+
+        logger.info(f"✅ Descoberta: {len(result_interfaces)} interfaces, {total_users} usuários PPPoE")
+        return {
+            "success": True,
+            "interfaces": result_interfaces,
+            "total_interfaces": len(result_interfaces),
+            "total_users": total_users,
+            "slot": slot,
+            "timestamp": datetime.now().isoformat()
+        }
+
+    except Exception as e:
+        logger.error(f"Erro na descoberta de interfaces: {e}")
+        return {"success": False, "error": str(e), "interfaces": [], "total_interfaces": 0, "total_users": 0}

@@ -19,7 +19,8 @@ from modules.web_routes import (
 from modules import audit_log as _audit_log
 from modules.api_routes import (
     get_online_total, pppoe_query, pppoe_disconnect,
-    get_connection_status, reconnect, bandwidth_data, pppoe_history, pppoe_by_interface
+    get_connection_status, reconnect, bandwidth_data, pppoe_history, pppoe_by_interface,
+    pppoe_interfaces_real, pppoe_users_by_interface, discover_physical_interfaces
 )
 
 # Importar módulos híbridos (novos)
@@ -194,8 +195,13 @@ async def route_pppoe_users_by_interface(slot: int = 0, interface: str = ""):
     from modules.api_routes import pppoe_users_by_interface
     return await pppoe_users_by_interface(slot=slot, interface=interface)
 
+@app.get("/api/discover_interfaces")
+async def route_discover_interfaces(slot: int = 0):
+    """API: Descoberta automatica de interfaces fisicas GE com contagem PPPoE"""
+    return await discover_physical_interfaces(slot=slot)
+
 # ============================================================================
-# ROTAS API (JSON) - SISTEMA HÍBRIDO
+# ROTAS API (JSON) - SISTEMA HÍBRIDOO
 # ============================================================================
 
 if HYBRID_AVAILABLE:
@@ -336,10 +342,13 @@ async def route_force_cache_refresh():
 @app.get("/logs", response_class=HTMLResponse)
 async def logs_page(request: Request):
     """Pagina de logs de auditoria"""
+    from fastapi.responses import RedirectResponse as _Redirect
     if not request.session.get("logged_in"):
-        return RedirectResponse(url="/login", status_code=302)
-    context = {"request": request, "page": "logs", "username": request.session.get("username", "")}
-    return templates.TemplateResponse("logs.html", context)
+        return _Redirect(url="/login", status_code=302)
+    from fastapi.templating import Jinja2Templates as _Jinja2
+    _tpl = _Jinja2(directory="templates")
+    context = {"request": request, "page": "logs", "session": request.session, "username": request.session.get("username", "")}
+    return _tpl.TemplateResponse("logs.html", context)
 
 @app.get("/api/audit_logs")
 async def api_audit_logs(request: Request, limit: int = 300):
