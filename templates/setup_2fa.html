@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Configurar 2FA — NE8000 Manager{% endblock %}
+{% block page_title %}Autenticacao de Dois Fatores (2FA){% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto space-y-6">
+    <!-- Status card -->
+    <div class="card p-5 flex items-center gap-4">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 {% if totp_enabled %}bg-green-100{% else %}bg-slate-100{% endif %}">
+            <i class="fas fa-shield-halved text-xl {% if totp_enabled %}text-green-600{% else %}text-slate-400{% endif %}"></i>
+        </div>
+        <div class="flex-1">
+            <div class="font-semibold text-slate-800">Status do 2FA</div>
+            <div class="text-sm {% if totp_enabled %}text-green-600{% else %}text-slate-500{% endif %}">
+                {% if totp_enabled %}Autenticacao de dois fatores esta ATIVADA{% else %}Autenticacao de dois fatores esta DESATIVADA{% endif %}
+            </div>
+        </div>
+        <span class="{% if totp_enabled %}badge-online{% else %}badge-offline{% endif %}">
+            {% if totp_enabled %}ATIVO{% else %}INATIVO{% endif %}
+        </span>
+    </div>
+
+    <!-- QR Code card -->
+    <div class="card p-6">
+        <h2 class="section-title mb-1">Configurar Aplicativo Autenticador</h2>
+        <p class="text-sm text-slate-500 mb-5">Escaneie o QR Code abaixo com o Google Authenticator, Authy ou qualquer app TOTP compativel.</p>
+
+        <div class="flex flex-col md:flex-row gap-6 items-start">
+            <div class="flex-shrink-0 bg-white border-2 border-slate-200 rounded-xl p-3 mx-auto md:mx-0">
+                <img src="data:image/png;base64,{{ qr_b64 }}" alt="QR Code 2FA" class="w-44 h-44">
+            </div>
+            <div class="flex-1 space-y-4">
+                <div>
+                    <div class="field-label mb-1">Conta / Emissor</div>
+                    <div class="field-value">{{ web_user }} @ {{ issuer }}</div>
+                </div>
+                <div>
+                    <div class="field-label mb-1">Chave Secreta (entrada manual)</div>
+                    <div class="flex items-center gap-2">
+                        <code class="field-value bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm tracking-widest select-all flex-1">{{ secret }}</code>
+                        <button onclick="copySecret()" class="btn-secondary text-xs px-3 py-2">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+                    <i class="fas fa-triangle-exclamation mr-1"></i>
+                    <strong>Importante:</strong> Guarde a chave secreta em local seguro. Ela nao pode ser recuperada depois.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Instructions -->
+    <div class="card p-6">
+        <h2 class="section-title mb-4">Como ativar o 2FA</h2>
+        <ol class="space-y-3 text-sm text-slate-700">
+            <li class="flex gap-3">
+                <span class="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
+                <span>Instale o <strong>Google Authenticator</strong> ou <strong>Authy</strong> no seu celular.</span>
+            </li>
+            <li class="flex gap-3">
+                <span class="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">2</span>
+                <span>Escaneie o QR Code acima ou insira a chave secreta manualmente no aplicativo.</span>
+            </li>
+            <li class="flex gap-3">
+                <span class="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">3</span>
+                <span>No arquivo <code class="bg-slate-100 px-1 rounded">.env</code>, defina <code class="bg-slate-100 px-1 rounded">TOTP_ENABLED=true</code> e <code class="bg-slate-100 px-1 rounded">TOTP_SECRET={{ secret }}</code>.</span>
+            </li>
+            <li class="flex gap-3">
+                <span class="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">4</span>
+                <span>Reinicie o servico. No proximo login, o campo de codigo 2FA sera exibido automaticamente.</span>
+            </li>
+        </ol>
+    </div>
+
+    <!-- .env snippet -->
+    <div class="card p-6">
+        <h2 class="section-title mb-3">Configuracao no .env</h2>
+        <pre class="bg-slate-900 text-green-400 rounded-xl p-4 text-xs overflow-x-auto font-mono leading-relaxed">TOTP_ENABLED=true
+TOTP_SECRET={{ secret }}
+TOTP_ISSUER={{ issuer }}</pre>
+    </div>
+</div>
+<script>
+function copySecret() {
+    navigator.clipboard.writeText('{{ secret }}').then(() => {
+        showMessage('Chave secreta copiada!', 'success');
+    });
+}
+</script>
+{% endblock %}

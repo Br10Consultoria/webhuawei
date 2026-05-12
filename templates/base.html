@@ -1,270 +1,107 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" class="h-full">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}NE8000 Network Monitor{% endblock %}</title>
+    <title>{% block title %}NE8000 Network Manager{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+    <style>
+        :root { --sw: 256px; }
+        body { font-family: system-ui, -apple-system, sans-serif; background:#f1f5f9; }
+        .sidebar { width:var(--sw); min-height:100vh; background:#0f172a; position:fixed; top:0; left:0; z-index:40; display:flex; flex-direction:column; transition:left .25s; }
+        .main-content { margin-left:var(--sw); min-height:100vh; display:flex; flex-direction:column; }
+        .nav-item { display:flex; align-items:center; gap:10px; padding:9px 14px; border-radius:8px; color:#94a3b8; text-decoration:none; transition:all .15s; font-size:13.5px; font-weight:500; }
+        .nav-item:hover { background:#1e293b; color:#f1f5f9; }
+        .nav-item.active { background:#2563eb; color:#fff; }
+        .nav-item i { width:16px; text-align:center; font-size:13px; }
+        .nav-section { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:#475569; padding:14px 14px 5px; }
+        .topbar { background:#fff; border-bottom:1px solid #e2e8f0; height:58px; display:flex; align-items:center; padding:0 24px; gap:14px; position:sticky; top:0; z-index:30; }
+        .card { background:#fff; border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,.07); border:1px solid #e2e8f0; }
+        .btn-primary { background:#2563eb; color:#fff; padding:9px 20px; border-radius:8px; font-size:13.5px; font-weight:600; border:none; cursor:pointer; transition:background .15s; display:inline-flex; align-items:center; gap:7px; }
+        .btn-primary:hover { background:#1d4ed8; }
+        .btn-danger { background:#dc2626; color:#fff; padding:9px 20px; border-radius:8px; font-size:13.5px; font-weight:600; border:none; cursor:pointer; transition:background .15s; display:inline-flex; align-items:center; gap:7px; }
+        .btn-danger:hover { background:#b91c1c; }
+        .btn-secondary { background:#f8fafc; color:#334155; padding:9px 20px; border-radius:8px; font-size:13.5px; font-weight:600; border:1px solid #e2e8f0; cursor:pointer; transition:all .15s; display:inline-flex; align-items:center; gap:7px; }
+        .btn-secondary:hover { background:#f1f5f9; }
+        .input-field { width:100%; padding:10px 14px; border:1px solid #e2e8f0; border-radius:8px; font-size:14px; transition:border .15s; outline:none; background:#fff; }
+        .input-field:focus { border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,.1); }
+        .badge-online { background:#dcfce7; color:#166534; padding:2px 10px; border-radius:20px; font-size:11.5px; font-weight:700; }
+        .badge-offline { background:#fee2e2; color:#991b1b; padding:2px 10px; border-radius:20px; font-size:11.5px; font-weight:700; }
+        .pulse-dot { width:8px; height:8px; border-radius:50%; display:inline-block; flex-shrink:0; }
+        .pulse-dot.green { background:#22c55e; animation:pulse 2s infinite; }
+        .pulse-dot.red { background:#ef4444; }
+        .pulse-dot.yellow { background:#f59e0b; }
+        @keyframes pulse { 0%,100%{box-shadow:0 0 0 3px rgba(34,197,94,.2)} 50%{box-shadow:0 0 0 6px rgba(34,197,94,.04)} }
+        @media (max-width:768px) { .sidebar{left:-256px} .sidebar.open{left:0} .main-content{margin-left:0} }
+    </style>
+    {% block extra_css %}{% endblock %}
 </head>
-<body class="bg-gray-50 min-h-screen flex flex-col">
-    <!-- Fixed Navigation Bar -->
-    <nav class="fixed top-0 w-full bg-white shadow-sm z-50">
-        <div class="container mx-auto px-4">
-            <div class="flex justify-between items-center h-16">
-                <!-- Logo and Brand -->
-                <div class="flex items-center space-x-3">
-                    <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-                        <span class="text-white text-xl font-bold">NE</span>
-                    </div>
-                    <span class="text-xl font-semibold text-gray-800">NE8000 Monitor</span>
-                </div>
-
-                {% if session.logged_in %}
-                <!-- Desktop Navigation -->
-                <div class="hidden md:flex items-center space-x-8">
-                    <a href="/dashboard" 
-                       class="text-gray-600 hover:text-blue-600 transition-colors">Dashboard</a>
-                    <a href="/pppoe" 
-                       class="text-gray-600 hover:text-blue-600 transition-colors">PPPoE</a>
-                    
-                    <!-- Menu Interfaces -->
-                    <div class="relative group">
-                        <button class="text-gray-600 hover:text-blue-600 transition-colors flex items-center">
-                            Interfaces
-                            <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                            </svg>
-                        </button>
-                        <div class="absolute left-0 mt-2 w-48 bg-white rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                            <div class="py-1">
-                                <a href="/interfaces/pppoe" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                    PPPoE por Interface
-                                </a>
-                                <a href="/interfaces/traffic" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                    Tráfego de Interfaces
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <a href="/docs" 
-                       class="text-gray-600 hover:text-blue-600 transition-colors">API Docs</a>
-                    
-                    <!-- User Menu -->
-                    <div class="flex items-center space-x-4">
-                        <!-- Router Status -->
-                        <div id="routerStatus" class="flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-medium bg-gray-100">
-                            <span id="statusDot" class="w-2 h-2 rounded-full bg-gray-400"></span>
-                            <span id="statusText" class="text-gray-600">Verificando...</span>
-                        </div>
-                        
-                        <!-- Clock -->
-                        <div class="bg-gray-100 px-3 py-1 rounded-full">
-                            <span id="digitalClock" class="text-sm text-gray-600 font-mono"></span>
-                        </div>
-                        
-                        <!-- Logout Button -->
-                        <a href="/logout" 
-                           class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors">
-                            Logout
-                        </a>
-                    </div>
-                </div>
-
-                <!-- Mobile Menu Button (apenas quando logado) -->
-                <button class="md:hidden text-gray-600 hover:text-gray-800" id="mobile-menu-button">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
-                    </svg>
-                </button>
-                {% else %}
-                <!-- Not logged in - show minimal info -->
-                <div class="text-sm text-gray-500">
-                    Faça login para acessar o sistema
-                </div>
-                {% endif %}
+<body>
+{% if session.logged_in %}
+<div class="flex">
+    <aside class="sidebar" id="sidebar">
+        <div class="flex items-center gap-3 px-4 py-4 border-b border-slate-800">
+            <div class="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                <i class="fas fa-network-wired text-white text-sm"></i>
             </div>
-
-            {% if session.logged_in %}
-            <!-- Mobile Navigation -->
-            <div class="md:hidden hidden" id="mobile-menu">
-                <div class="px-2 pt-2 pb-3 space-y-1">
-                    <a href="/dashboard" 
-                       class="block px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100">Dashboard</a>
-                    <a href="/pppoe" 
-                       class="block px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100">PPPoE</a>
-                    
-                    <!-- Mobile Interfaces Menu -->
-                    <div class="px-3 py-2">
-                        <div class="text-gray-600 font-medium mb-2">Interfaces</div>
-                        <div class="ml-4 space-y-1">
-                            <a href="/interfaces/pppoe" 
-                               class="block px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100 text-sm">
-                                PPPoE por Interface
-                            </a>
-                            <a href="/interfaces/traffic" 
-                               class="block px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100 text-sm">
-                                Tráfego de Interfaces
-                            </a>
-                        </div>
-                    </div>
-                    
-                    <a href="/docs" 
-                       class="block px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100">API Docs</a>
-                    
-                    <!-- Mobile Clock -->
-                    <div class="px-3 py-2">
-                        <span id="mobileClock" class="text-sm text-gray-600 font-mono"></span>
-                    </div>
-                    
-                    <!-- Mobile Logout -->
-                    <a href="/logout" 
-                       class="block px-3 py-2 text-red-600 hover:bg-red-50 rounded-md">Logout</a>
-                </div>
-            </div>
-            {% endif %}
-        </div>
-    </nav>
-
-    <!-- Main Content -->
-    <main class="flex-grow container mx-auto px-4 pt-20 pb-16">
-        <!-- Messages Area -->
-        <div id="messages" class="mb-4"></div>
-
-        {% block content %}{% endblock %}
-    </main>
-
-    <!-- Footer -->
-    <footer class="bg-white border-t border-gray-200">
-        <div class="container mx-auto px-4 py-6">
-            <div class="flex flex-col md:flex-row justify-between items-center">
-                <div class="text-gray-600 text-sm">
-                    © 2025 NE8000 Network Monitor. Sistema Simplificado v2.0
-                </div>
-                {% if session.logged_in %}
-                <div class="flex space-x-6 mt-4 md:mt-0">
-                    <a href="/health" class="text-gray-500 hover:text-blue-600 text-sm">
-                        Health Check
-                    </a>
-                    <a href="/docs" class="text-gray-500 hover:text-blue-600 text-sm">
-                        API Documentation
-                    </a>
-                </div>
-                {% endif %}
+            <div>
+                <div class="text-white font-bold text-sm">NE8000 Manager</div>
+                <div class="text-slate-500 text-xs">Huawei BNG Monitor</div>
             </div>
         </div>
-    </footer>
-
-    <script>
-    // Only initialize interactive features if user is logged in
-    {% if session.logged_in %}
-    
-    // Mobile menu toggle
-    const mobileMenuButton = document.getElementById('mobile-menu-button');
-    const mobileMenu = document.getElementById('mobile-menu');
-    
-    if (mobileMenuButton && mobileMenu) {
-        mobileMenuButton.addEventListener('click', function() {
-            mobileMenu.classList.toggle('hidden');
-        });
-    }
-
-    // Clock functionality
-    function updateClock() {
-        const now = new Date();
-        const options = {
-            timeZone: 'America/Bahia',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            day: '2-digit',
-            month: '2-digit',
-            year: '2-digit',
-            hour12: false
-        };
-        const formatter = new Intl.DateTimeFormat('pt-BR', options);
-        const parts = formatter.formatToParts(now);
-        const clockStr = `${parts.find(p => p.type === 'day').value}/${parts.find(p => p.type === 'month').value}/${parts.find(p => p.type === 'year').value} ${parts.find(p => p.type === 'hour').value}:${parts.find(p => p.type === 'minute').value}:${parts.find(p => p.type === 'second').value}`;
-        
-        const clockElement = document.getElementById('digitalClock');
-        const mobileClockElement = document.getElementById('mobileClock');
-        
-        if (clockElement) clockElement.textContent = clockStr;
-        if (mobileClockElement) mobileClockElement.textContent = clockStr;
-    }
-    
-    // Start clock
-    setInterval(updateClock, 1000);
-    updateClock();
-
-    // Router status check
-    async function checkRouterStatus() {
-        try {
-            const response = await fetch('/api/connection_status');
-            const data = await response.json();
-            
-            const statusDot = document.getElementById('statusDot');
-            const statusText = document.getElementById('statusText');
-            const routerStatus = document.getElementById('routerStatus');
-            
-            if (!statusDot || !statusText || !routerStatus) return;
-            
-            if (data.connected) {
-                statusDot.className = 'w-2 h-2 rounded-full bg-green-500';
-                statusText.textContent = 'Online';
-                statusText.className = 'text-green-700';
-                routerStatus.className = 'flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-medium bg-green-100';
-            } else {
-                statusDot.className = 'w-2 h-2 rounded-full bg-yellow-500';
-                statusText.textContent = 'Cache';
-                statusText.className = 'text-yellow-700';
-                routerStatus.className = 'flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-medium bg-yellow-100';
-            }
-        } catch (error) {
-            const statusDot = document.getElementById('statusDot');
-            const statusText = document.getElementById('statusText');
-            const routerStatus = document.getElementById('routerStatus');
-            
-            if (!statusDot || !statusText || !routerStatus) return;
-            
-            statusDot.className = 'w-2 h-2 rounded-full bg-red-500';
-            statusText.textContent = 'Erro';
-            statusText.className = 'text-red-700';
-            routerStatus.className = 'flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-medium bg-red-100';
-        }
-    }
-    
-    // Check router status every 30 seconds
-    setInterval(checkRouterStatus, 30000);
-    checkRouterStatus(); // Check immediately
-    
-    {% endif %}
-
-    // Função para mostrar mensagens (disponível sempre)
-    function showMessage(message, type = 'info') {
-        const messagesDiv = document.getElementById('messages');
-        if (!messagesDiv) return;
-        
-        const messageDiv = document.createElement('div');
-        
-        let bgColor = 'bg-blue-50 text-blue-700 border-blue-200';
-        if (type === 'error') bgColor = 'bg-red-50 text-red-700 border-red-200';
-        if (type === 'success') bgColor = 'bg-green-50 text-green-700 border-green-200';
-        if (type === 'warning') bgColor = 'bg-yellow-50 text-yellow-700 border-yellow-200';
-        
-        messageDiv.className = `p-4 rounded-lg border ${bgColor} mb-4`;
-        messageDiv.textContent = message;
-        
-        messagesDiv.appendChild(messageDiv);
-        
-        // Auto-remove after 5 seconds
-        setTimeout(() => {
-            messageDiv.remove();
-        }, 5000);
-    }
-    </script>
+        <nav class="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
+            <div class="nav-section">Principal</div>
+            <a href="/dashboard" class="nav-item {% if request.url.path == '/dashboard' %}active{% endif %}"><i class="fas fa-gauge-high"></i> Dashboard</a>
+            <a href="/pppoe" class="nav-item {% if request.url.path == '/pppoe' %}active{% endif %}"><i class="fas fa-user-circle"></i> Consulta PPPoE</a>
+            <div class="nav-section">Infraestrutura</div>
+            <a href="/interfaces/pppoe" class="nav-item {% if '/interfaces' in request.url.path %}active{% endif %}"><i class="fas fa-ethernet"></i> Interfaces PPPoE</a>
+            <div class="nav-section">Sistema</div>
+            <a href="/setup-2fa" class="nav-item {% if request.url.path == '/setup-2fa' %}active{% endif %}"><i class="fas fa-shield-halved"></i> Autenticacao 2FA</a>
+            <a href="/health" class="nav-item" target="_blank"><i class="fas fa-heart-pulse"></i> Health Check</a>
+        </nav>
+        <div class="px-3 py-3 border-t border-slate-800">
+            <div class="flex items-center gap-3 px-2 py-2 mb-1">
+                <div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
+                    <i class="fas fa-user text-white text-xs"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="text-slate-200 text-sm font-semibold truncate">{{ session.username or 'Admin' }}</div>
+                    <div class="text-slate-500 text-xs">Administrador</div>
+                </div>
+            </div>
+            <a href="/logout" class="nav-item" style="color:#f87171"><i class="fas fa-right-from-bracket"></i> Sair do sistema</a>
+        </div>
+    </aside>
+    <div class="main-content flex-1">
+        <header class="topbar">
+            <button class="md:hidden text-slate-400 hover:text-slate-600 mr-1" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+            <div class="flex-1"><span class="text-slate-700 font-semibold text-sm">{% block page_title %}Dashboard{% endblock %}</span></div>
+            <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
+                <span class="pulse-dot yellow" id="statusDot"></span>
+                <span class="text-xs font-medium text-slate-600" id="statusText">Verificando...</span>
+            </div>
+            <div class="text-xs text-slate-400 font-mono hidden sm:block" id="clockDisplay"></div>
+        </header>
+        <div id="messages" class="px-6 pt-3 space-y-2"></div>
+        <main class="flex-1 p-6">{% block content %}{% endblock %}</main>
+    </div>
+</div>
+<div id="sidebarOverlay" class="hidden fixed inset-0 bg-black/50 z-30 md:hidden" onclick="toggleSidebar()"></div>
+{% else %}
+<div class="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 flex items-center justify-center p-4">
+    {% block content %}{% endblock %}
+</div>
+{% endif %}
+<script>
+function toggleSidebar(){const s=document.getElementById('sidebar'),o=document.getElementById('sidebarOverlay');if(s)s.classList.toggle('open');if(o)o.classList.toggle('hidden');}
+(function clock(){const el=document.getElementById('clockDisplay');if(el)el.textContent=new Date().toLocaleTimeString('pt-BR');setTimeout(clock,1000);})();
+{% if session.logged_in %}
+async function checkRouterStatus(){try{const r=await fetch('/api/connection_status'),d=await r.json(),dot=document.getElementById('statusDot'),txt=document.getElementById('statusText');if(!dot||!txt)return;if(d.connected){dot.className='pulse-dot green';txt.textContent=(d.protocol||'SSH').toUpperCase()+' — Conectado';txt.style.color='#15803d';}else{dot.className='pulse-dot red';txt.textContent='Desconectado';txt.style.color='#dc2626';}}catch(e){const dot=document.getElementById('statusDot');if(dot)dot.className='pulse-dot red';}}
+setInterval(checkRouterStatus,30000);checkRouterStatus();
+function showMessage(msg,type='info'){const div=document.getElementById('messages');if(!div)return;const icons={success:'fa-check-circle',error:'fa-circle-xmark',info:'fa-circle-info',warning:'fa-triangle-exclamation'};const colors={success:'bg-green-50 border-green-200 text-green-800',error:'bg-red-50 border-red-200 text-red-800',info:'bg-blue-50 border-blue-200 text-blue-800',warning:'bg-amber-50 border-amber-200 text-amber-800'};const el=document.createElement('div');el.className=`p-3 rounded-lg border text-sm flex items-center gap-2 ${colors[type]||colors.info}`;el.innerHTML=`<i class="fas ${icons[type]||icons.info}"></i><span>${msg}</span>`;div.appendChild(el);setTimeout(()=>el.remove(),5000);}
+{% endif %}
+</script>
+{% block extra_js %}{% endblock %}
 </body>
 </html>

@@ -495,3 +495,100 @@ async def pppoe_by_interface():
             "total_interfaces": 0,
             "total_users": 0
         } 
+
+# =============================================================================
+# NOVAS FUNÇÕES: Interfaces PPPoE reais via SSH (sem SNMP)
+# =============================================================================
+
+async def pppoe_interfaces_real(slot: int = 0, interface: str = "", vlan: int = 0):
+    """
+    Contagem real de usuários PPPoE por interface física ou VLAN via SSH.
+    Comandos:
+      - Total por interface: display access-user slot 0 | include GE0/1/X | exclude PPPoE | count
+      - Por VLAN: display access-user slot 0 | include GE0/1/X.VLAN | exclude PPPoE | count
+    """
+    try:
+        ssh_conn = get_ssh_connection()
+
+        if not interface:
+            return {"success": False, "error": "Parâmetro 'interface' obrigatório (ex: GE0/1/0)"}
+
+        if vlan and vlan > 0:
+            cmd = f"display access-user slot {slot} | include {interface}.{vlan} | exclude PPPoE | count"
+        else:
+            cmd = f"display access-user slot {slot} | include {interface} | exclude PPPoE | count"
+
+        logger.info(f"Executando: {cmd}")
+        output = ssh_conn.execute_command(cmd)
+
+        # Extrair número do output "  X user(s) found." ou "Total: X"
+        import re
+        count = 0
+        m = re.search(r"(\d+)\s+(?:user|record|line)", output, re.IGNORECASE)
+        if not m:
+            m = re.search(r"Total\s*[:\s]+(\d+)", output, re.IGNORECASE)
+        if not m:
+            m = re.search(r"^\s*(\d+)\s*$", output.strip(), re.MULTILINE)
+        if m:
+            count = int(m.group(1))
+
+        return {
+            "success": True,
+            "interface": interface,
+            "vlan": vlan if vlan else None,
+            "slot": slot,
+            "count": count,
+            "command": cmd,
+            "raw_output": output,
+            "timestamp": datetime.now().isoformat()
+        }
+
+    except Exception as e:
+        logger.error(f"Erro ao consultar interfaces PPPoE: {e}")
+        return {"success": False, "error": str(e), "count": 0}
+
+
+async def pppoe_users_by_interface(slot: int = 0, interface: str = ""):
+    """
+    Lista de usuários PPPoE por interface física via SSH.
+    Comando: display access-user slot 0 | include GE0/1/X | exclude PPPoE
+    """
+    try:
+        ssh_conn = get_ssh_connection()
+
+        if not interface:
+            return {"success": False, "error": "Parâmetro 'interface' obrigatório (ex: GE0/1/0)"}
+
+        cmd = f"display access-user slot {slot} | include {interface} | exclude PPPoE"
+        logger.info(f"Executando: {cmd}")
+        output = ssh_conn.execute_command(cmd)
+
+        # Parsear linhas de usuários
+        import re
+        users = []
+        for line in output.split("\n"):
+            line = line.strip()
+            if not line or line.startswith("-") or "Total" in line or "Index" in line:
+                continue
+            # Formato típico: Index  Username  IP  MAC  Interface  ...
+            parts = re.split(r"\s{2,}", line)
+            if len(parts) >= 2:
+                users.append({
+                    "raw": line,
+                    "fields": parts
+                })
+
+        return {
+            "success": True,
+            "interface": interface,
+            "slot": slot,
+            "count": len(users),
+            "users": users,
+            "command": cmd,
+            "raw_output": output,
+            "timestamp": datetime.now().isoformat()
+        }
+
+    except Exception as e:
+        logger.error(f"Erro ao listar usuários por interface: {e}")
+        return {"success": False, "error": str(e), "users": [], "count": 0}

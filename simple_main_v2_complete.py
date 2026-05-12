@@ -14,7 +14,7 @@ from modules.cache_manager import get_cache
 from modules.web_routes import (
     login_page, login_post, logout,
     dashboard, pppoe_page, bandwidth_graph_page, pppoe_history_page,
-    interfaces_pppoe_page, interfaces_traffic_page
+    interfaces_pppoe_page, interfaces_traffic_page, setup_2fa_page
 )
 from modules.api_routes import (
     get_online_total, pppoe_query, pppoe_disconnect,
@@ -81,9 +81,14 @@ async def route_login_page(request: Request, error: str = None):
     return await login_page(request, error)
 
 @app.post("/login")
-async def route_login_post(request: Request, username: str = Form(...), password: str = Form(...)):
-    """Processar login"""
-    return await login_post(request, username, password)
+async def route_login_post(request: Request, username: str = Form(...), password: str = Form(...), totp_token: str = Form(default="")):
+    """Processar login com suporte a 2FA"""
+    return await login_post(request, username, password, totp_token)
+
+@app.get("/setup-2fa", response_class=HTMLResponse)
+async def route_setup_2fa(request: Request):
+    """Página de configuração do 2FA"""
+    return await setup_2fa_page(request)
 
 @app.get("/logout")
 async def route_logout(request: Request):
@@ -175,6 +180,18 @@ async def route_pppoe_history(username: str):
 async def route_pppoe_by_interface():
     """API: Obter estatísticas PPPoE por interface"""
     return await pppoe_by_interface()
+
+@app.get("/api/pppoe_interfaces_real")
+async def route_pppoe_interfaces_real(slot: int = 0, interface: str = "", vlan: int = 0):
+    """API: Contagem real de PPPoE por interface/VLAN via SSH"""
+    from modules.api_routes import pppoe_interfaces_real
+    return await pppoe_interfaces_real(slot=slot, interface=interface, vlan=vlan)
+
+@app.get("/api/pppoe_users_by_interface")
+async def route_pppoe_users_by_interface(slot: int = 0, interface: str = ""):
+    """API: Lista de usuários PPPoE por interface via SSH"""
+    from modules.api_routes import pppoe_users_by_interface
+    return await pppoe_users_by_interface(slot=slot, interface=interface)
 
 # ============================================================================
 # ROTAS API (JSON) - SISTEMA HÍBRIDO
@@ -301,8 +318,8 @@ async def route_force_cache_refresh():
         cache = get_cache()
         
         # Remove entries related to PPPoE data
-        cache.delete("pppoe_online_total")
-        cache.delete("pppoe_interfaces_data")
+        cache.remove("pppoe_online_total")
+        cache.remove("pppoe_interfaces_data")
         
         logger.info("Cache forçadamente limpo - próxima consulta será em tempo real")
         
