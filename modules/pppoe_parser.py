@@ -1,5 +1,6 @@
 """
-Módulo de parsing PPPoE otimizado para NE8000 com tratamento de usuários offline
+Módulo de parsing PPPoE otimizado para Huawei NE8000
+Extrai todos os campos relevantes do output de 'display access-user username <user> verbose'
 """
 
 import logging
@@ -9,434 +10,422 @@ from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
-def format_online_time(time_str):
+
+def format_online_time(time_str: str) -> str:
     """
-    Converte tempo de formato HH:MM:SS para formato legível com dias, horas, minutos e segundos
-    
-    Args:
-        time_str (str): Tempo no formato "HH:MM:SS" (ex: "231:15:55")
-    
-    Returns:
-        str: Tempo formatado (ex: "9 dias, 15 horas, 15 minutos e 55 segundos")
+    Converte tempo no formato H:MM:SS ou HH:MM:SS para texto legível em português.
+    Exemplo: "61:18:02" → "2 dias, 13 horas, 18 minutos e 2 segundos"
     """
     try:
-        # Verifica se o tempo é válido
-        if not time_str or time_str == "-" or time_str.strip() == "":
+        if not time_str or time_str.strip() in ("-", ""):
             return "-"
-        
-        # Separa horas, minutos e segundos
-        parts = time_str.split(':')
+
+        parts = time_str.strip().split(":")
         if len(parts) != 3:
-            return time_str  # Retorna original se formato inválido
-        
+            return time_str
+
         total_hours = int(parts[0])
         minutes = int(parts[1])
         seconds = int(parts[2])
-        
-        # Calcula dias e horas restantes
+
         days = total_hours // 24
         hours = total_hours % 24
-        
-        # Constrói a string formatada
+
         result_parts = []
-        
         if days > 0:
-            if days == 1:
-                result_parts.append(f"{days} dia")
-            else:
-                result_parts.append(f"{days} dias")
-        
+            result_parts.append(f"{days} {'dia' if days == 1 else 'dias'}")
         if hours > 0:
-            if hours == 1:
-                result_parts.append(f"{hours} hora")
-            else:
-                result_parts.append(f"{hours} horas")
-        
+            result_parts.append(f"{hours} {'hora' if hours == 1 else 'horas'}")
         if minutes > 0:
-            if minutes == 1:
-                result_parts.append(f"{minutes} minuto")
-            else:
-                result_parts.append(f"{minutes} minutos")
-        
+            result_parts.append(f"{minutes} {'minuto' if minutes == 1 else 'minutos'}")
         if seconds > 0:
-            if seconds == 1:
-                result_parts.append(f"{seconds} segundo")
-            else:
-                result_parts.append(f"{seconds} segundos")
-        
-        # Junta as partes com vírgulas e "e" antes da última
-        if len(result_parts) == 0:
+            result_parts.append(f"{seconds} {'segundo' if seconds == 1 else 'segundos'}")
+
+        if not result_parts:
             return "0 segundos"
-        elif len(result_parts) == 1:
+        if len(result_parts) == 1:
             return result_parts[0]
-        elif len(result_parts) == 2:
+        if len(result_parts) == 2:
             return f"{result_parts[0]} e {result_parts[1]}"
-        else:
-            return f"{', '.join(result_parts[:-1])} e {result_parts[-1]}"
-    
+        return f"{', '.join(result_parts[:-1])} e {result_parts[-1]}"
+
     except (ValueError, IndexError):
-        return time_str  # Retorna original em caso de erro
+        return time_str
+
+
+def _extract(line: str) -> str:
+    """Extrai o valor após ':' em uma linha do output Huawei."""
+    match = re.search(r":\s*(.+)", line)
+    return match.group(1).strip() if match else "-"
+
 
 def parse_pppoe_output(output: str) -> Dict:
-    """Parse do output PPPoE do BNG Huawei"""
+    """Parse do output de contagem total de usuários PPPoE no BNG."""
     try:
         total = 0
-        lines = output.split('\n')
-        for line in lines:
+        for line in output.split("\n"):
             line = line.strip()
-            if not line:
-                continue
-            
-            if 'Total users' in line and ':' in line:
-                match = re.search(r'Total users\s*:\s*(\d+)', line)
-                if match:
-                    total = int(match.group(1))
-                    logger.info(f"Total PPPoE users encontrado: {total}")
+            if "Total users" in line and ":" in line:
+                m = re.search(r"Total users\s*:\s*(\d+)", line)
+                if m:
+                    total = int(m.group(1))
                     break
-        
         return {
             "total": total,
             "active": total,
             "peak": total,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
     except Exception as e:
         logger.error(f"Erro ao fazer parse PPPoE BNG: {e}")
         return {"total": 0, "active": 0, "peak": 0, "error": str(e)}
 
+
 def parse_pppoe_user_output(output: str, username: str) -> Dict:
     """
-    Parse do output de consulta individual de usuário PPPoE
-    MELHORADO para tratar usuários offline e debug detalhado
+    Parse completo do output de 'display access-user username <user> verbose' no NE8000.
+    Extrai: IPv4, IPv6, uptime, interface, MAC, VLAN, DNS, velocidade em tempo real, etc.
     """
-    try:
-        # Log detalhado do output recebido
-        logger.debug(f"🔍 Parsing output para usuário {username}:")
-        logger.debug(f"Output bruto (primeiras 200 chars): {output[:200]}...")
-        
-        user_data = {
-            "username": username,
-            "status": "OFFLINE",  # Default: offline
-            "interface": "-",
-            "ip_address": "-",
-            "gateway": "-",
-            "ipv6_interface_id": "-",
-            "ipv6_link_local": "-",
-            "ipv6_ndra_prefix": "-",
-            "ipv6_pd_prefix": "-",
-            "ipv6_duid": "-",
-            "ipv6_primary_dns": "-",
-            "ipv6_secondary_dns": "-",
-            "online_time": "-",
-            "ipv6_lease": "-",
-            "remain_lease": "-",
-            "ipv6_mtu": "-",
-            "raw_output": output,
-            "formatted_message": ""
-        }
-        
-        # Verificar se o usuário não está online
-        if not output or output.strip() == "":
-            user_data["status"] = "OFFLINE"
-            user_data["formatted_message"] = f"❌ Nenhum dado retornado para o usuário {username}"
-            logger.info(f"📋 {username}: Sem dados no output - marcando como OFFLINE")
-            return user_data
-        
-        # Verificar mensagem específica de usuário offline
-        if "Info: No online user!" in output:
-            user_data["status"] = "OFFLINE"
-            user_data["formatted_message"] = f"🔴 Usuário {username} está OFFLINE"
-            user_data["offline_reason"] = "Usuário não está conectado no momento"
-            logger.info(f"📋 {username}: Mensagem 'No online user!' encontrada - OFFLINE")
-            return user_data
-        
-        # Verificar outras mensagens que indicam usuário offline
-        offline_indicators = [
-            "No online user",
-            "User not online",
-            "not found",
-            "does not exist",
-            "No such user"
-        ]
-        
-        for indicator in offline_indicators:
-            if indicator.lower() in output.lower():
-                user_data["status"] = "OFFLINE"
-                user_data["formatted_message"] = f"🔴 Usuário {username} está OFFLINE"
-                user_data["offline_reason"] = f"Indicador encontrado: {indicator}"
-                logger.info(f"📋 {username}: Indicador '{indicator}' encontrado - OFFLINE")
-                return user_data
-        
-        # Verificar mensagens de erro REAL do sistema (não usuário offline)
-        if any(error in output for error in ["Error:", "Failed:", "Access denied", "Authentication failed"]):
-            user_data["status"] = "ERROR"
-            user_data["formatted_message"] = f"⚠️ Erro no sistema ao consultar usuário {username}"
-            user_data["error_details"] = output.strip()
-            logger.error(f"📋 {username}: Erro real do sistema encontrado")
-            return user_data
-        
-        lines = output.split('\n')
-        has_online_data = False
-        found_data_fields = []
-        
-        logger.debug(f"📋 {username}: Analisando {len(lines)} linhas do output...")
-        
-        for line_num, line in enumerate(lines, 1):
-            line = line.strip()
-            if not line:
-                continue
-            
-            # Verificar se usuário está online - múltiplos indicadores
-            online_indicators = [
-                'Online time',
-                'User access interface',
-                'User IP address',
-                'Realtime speed',
-                'access interface',
-                'IP address'
-            ]
-            
-            for indicator in online_indicators:
-                if indicator in line:
-                    user_data["status"] = "ONLINE"
-                    has_online_data = True
-                    found_data_fields.append(f"{indicator} (linha {line_num})")
-                    logger.debug(f"📋 {username}: Indicador ONLINE '{indicator}' encontrado na linha {line_num}")
-                    break
-            
-            # Extrair informações específicas
-            if 'User access interface' in line:
-                match = re.search(r':\s*(.+)', line)
-                if match:
-                    user_data["interface"] = match.group(1).strip()
-                    logger.debug(f"📋 {username}: Interface extraída: {user_data['interface']}")
-            
-            elif 'User IP address' in line:
-                match = re.search(r':\s*(.+)', line)
-                if match:
-                    user_data["ip_address"] = match.group(1).strip()
-                    logger.debug(f"📋 {username}: IP extraído: {user_data['ip_address']}")
-            
-            elif 'User gateway address' in line:
-                match = re.search(r':\s*(.+)', line)
-                if match:
-                    user_data["gateway"] = match.group(1).strip()
-            
-            elif 'User IPv6 InterfaceID' in line:
-                match = re.search(r':\s*(.+)', line)
-                if match:
-                    user_data["ipv6_interface_id"] = match.group(1).strip()
-            
-            elif 'User IPv6 linkLocal address' in line:
-                match = re.search(r':\s*(.+)', line)
-                if match:
-                    user_data["ipv6_link_local"] = match.group(1).strip()
-            
-            elif 'User IPv6 NDRA Prefix' in line:
-                match = re.search(r':\s*(.+)', line)
-                if match:
-                    user_data["ipv6_ndra_prefix"] = match.group(1).strip()
-            
-            elif 'User IPv6 PD Prefix' in line:
-                match = re.search(r':\s*(.+)', line)
-                if match:
-                    user_data["ipv6_pd_prefix"] = match.group(1).strip()
-            
-            elif 'IPv6 DUID' in line:
-                match = re.search(r':\s*(.+)', line)
-                if match:
-                    user_data["ipv6_duid"] = match.group(1).strip()
-            
-            elif 'User IPv6 Primary-DNS' in line:
-                match = re.search(r':\s*(.+)', line)
-                if match:
-                    user_data["ipv6_primary_dns"] = match.group(1).strip()
-            
-            elif 'User IPv6 Secondary-DNS' in line:
-                match = re.search(r':\s*(.+)', line)
-                if match:
-                    user_data["ipv6_secondary_dns"] = match.group(1).strip()
-            
-            elif 'Online time' in line:
-                match = re.search(r':\s*(.+)', line)
-                if match:
-                    online_time_value = match.group(1).strip()
-                    user_data["online_time"] = online_time_value
-                    logger.debug(f"📋 {username}: Tempo online extraído: '{online_time_value}' da linha: '{line}'")
-            
-            elif 'User IPv6 lease' in line:
-                match = re.search(r':\s*(.+)', line)
-                if match:
-                    user_data["ipv6_lease"] = match.group(1).strip()
-            
-            elif 'Remain IPv6 lease' in line:
-                match = re.search(r':\s*(.+)', line)
-                if match:
-                    user_data["remain_lease"] = match.group(1).strip()
-            
-            elif 'IPv6 MTU' in line:
-                match = re.search(r':\s*(.+)', line)
-                if match:
-                    user_data["ipv6_mtu"] = match.group(1).strip()
-                    
-            # Dados de tráfego em tempo real
-            elif 'Realtime speed' in line and 'inbound' not in line and 'outbound' not in line:
-                match = re.search(r':\s*(\d+)\s*kbyte/min', line)
-                if match:
-                    kbyte_min = int(match.group(1))
-                    # Converter para MB/min
-                    mb_min = round(kbyte_min / 1024, 2)
-                    user_data["realtime_speed"] = f"{kbyte_min} kbyte/min ({mb_min} MB/min)"
-                    user_data["realtime_speed_kbyte"] = kbyte_min
-                    user_data["realtime_speed_mb"] = mb_min
-                    logger.debug(f"📋 {username}: Velocidade total: {mb_min} MB/min")
-            
-            elif 'Realtime speed inbound' in line:
-                match = re.search(r':\s*(\d+)\s*kbyte/min', line)
-                if match:
-                    kbyte_min = int(match.group(1))
-                    mb_min = round(kbyte_min / 1024, 2)
-                    user_data["realtime_speed_inbound"] = f"{kbyte_min} kbyte/min ({mb_min} MB/min)"
-                    user_data["realtime_speed_inbound_kbyte"] = kbyte_min
-                    user_data["realtime_speed_inbound_mb"] = mb_min
-                    logger.debug(f"📋 {username}: Velocidade inbound: {mb_min} MB/min")
-            
-            elif 'Realtime speed outbound' in line:
-                match = re.search(r':\s*(\d+)\s*kbyte/min', line)
-                if match:
-                    kbyte_min = int(match.group(1))
-                    mb_min = round(kbyte_min / 1024, 2)
-                    user_data["realtime_speed_outbound"] = f"{kbyte_min} kbyte/min ({mb_min} MB/min)"
-                    user_data["realtime_speed_outbound_kbyte"] = kbyte_min
-                    user_data["realtime_speed_outbound_mb"] = mb_min
-                    logger.debug(f"📋 {username}: Velocidade outbound: {mb_min} MB/min")
-        
-        # Log do resultado da análise
-        if has_online_data:
-            logger.info(f"📋 {username}: Dados ONLINE encontrados - campos: {', '.join(found_data_fields)}")
-        else:
-            logger.info(f"📋 {username}: Nenhum dado ONLINE encontrado - marcando como OFFLINE")
-        
-        # Criar mensagem formatada baseada no status
-        if user_data["status"] == "ONLINE":
-            user_data["formatted_message"] = f"🟢 Usuário {username} está ONLINE"
-            if user_data["interface"] != "-":
-                user_data["formatted_message"] += f" na interface {user_data['interface']}"
-            if user_data["ip_address"] != "-":
-                user_data["formatted_message"] += f" com IP {user_data['ip_address']}"
-            
-            # Melhorar formatação do tempo online
-            online_time_raw = user_data.get('online_time', '-')
-            if online_time_raw and online_time_raw != "-":
-                try:
-                    formatted_time = format_online_time(online_time_raw)
-                    user_data["formatted_message"] += f" (online há {formatted_time})"
-                    logger.debug(f"📋 {username}: Tempo original: '{online_time_raw}' -> Formatado: '{formatted_time}'")
-                except Exception as e:
-                    logger.error(f"📋 {username}: Erro ao formatar tempo online '{online_time_raw}': {e}")
-                    user_data["formatted_message"] += f" (online há {online_time_raw})"
-            else:
-                user_data["formatted_message"] += " (tempo online não disponível)"
-        else:
-            # Se não encontrou dados de usuário online, garantir que seja OFFLINE
-            user_data["status"] = "OFFLINE"
-            user_data["formatted_message"] = f"🔴 Usuário {username} está OFFLINE"
-        
-        # Log final
-        logger.info(f"📋 {username}: Status final determinado: {user_data['status']}")
-        
+    user_data: Dict = {
+        # Identificação
+        "username": username,
+        "status": "OFFLINE",
+        "domain": "-",
+        "access_index": "-",
+        # Rede IPv4
+        "ip_address": "-",
+        "gateway": "-",
+        "primary_dns": "-",
+        "secondary_dns": "-",
+        "netmask": "-",
+        # Rede IPv6
+        "ipv6_interface_id": "-",
+        "ipv6_link_local": "-",
+        "ipv6_ndra_prefix": "-",
+        "ipv6_pd_prefix": "-",
+        "ipv6_duid": "-",
+        "ipv6_primary_dns": "-",
+        "ipv6_secondary_dns": "-",
+        "ipv6_lease": "-",
+        "remain_lease": "-",
+        "ipv6_mtu": "-",
+        "ipv6_authen_type": "-",
+        # Sessão
+        "interface": "-",
+        "mac_address": "-",
+        "vlan": "-",
+        "access_type": "-",
+        "access_slot": "-",
+        "online_time": "-",
+        "online_time_raw": "-",
+        "online_time_formatted": "-",
+        "access_start_time": "-",
+        "accounting_start_time": "-",
+        "accounting_session_id": "-",
+        # QoS / Velocidade
+        "inbound_cir": "-",
+        "outbound_cir": "-",
+        "realtime_speed": "-",
+        "realtime_speed_kbyte": 0,
+        "realtime_speed_mb": 0.0,
+        "realtime_speed_inbound": "-",
+        "realtime_speed_inbound_kbyte": 0,
+        "realtime_speed_inbound_mb": 0.0,
+        "realtime_speed_outbound": "-",
+        "realtime_speed_outbound_kbyte": 0,
+        "realtime_speed_outbound_mb": 0.0,
+        # RADIUS
+        "radius_server": "-",
+        "authen_result": "-",
+        # Outros
+        "mtu": "-",
+        "raw_output": output,
+        "formatted_message": "",
+    }
+
+    # ---------------------------------------------------------------
+    # Verificações de usuário offline / erro
+    # ---------------------------------------------------------------
+    if not output or not output.strip():
+        user_data["formatted_message"] = f"❌ Nenhum dado retornado para {username}"
+        logger.info(f"📋 {username}: Output vazio — OFFLINE")
         return user_data
-        
-    except Exception as e:
-        logger.error(f"📋 {username}: EXCEÇÃO ao fazer parse - {e}")
-        logger.error(f"📋 {username}: Output que causou erro: {output[:500]}...")
-        
-        # EM CASO DE ERRO, SEMPRE RETORNAR OFFLINE (não ERROR)
-        # Isso evita status "desconhecido" no frontend
-        return {
-            "username": username,
-            "status": "OFFLINE",  # Mudança: retorna OFFLINE em vez de ERROR
-            "error": str(e),
-            "formatted_message": f"🔴 Usuário {username} está OFFLINE (erro no processamento)",
-            "raw_output": output,
-            "error_details": f"Erro técnico: {str(e)}"
-        }
+
+    offline_patterns = [
+        "Info: No online user",
+        "No online user",
+        "User not online",
+        "not found",
+        "does not exist",
+        "No such user",
+    ]
+    for pat in offline_patterns:
+        if pat.lower() in output.lower():
+            user_data["status"] = "OFFLINE"
+            user_data["formatted_message"] = f"🔴 Usuário {username} está OFFLINE"
+            user_data["offline_reason"] = f"Indicador: {pat}"
+            logger.info(f"📋 {username}: '{pat}' encontrado — OFFLINE")
+            return user_data
+
+    if any(e in output for e in ["Error:", "Failed:", "Access denied", "Authentication failed"]):
+        user_data["status"] = "ERROR"
+        user_data["formatted_message"] = f"⚠️ Erro no sistema ao consultar {username}"
+        user_data["error_details"] = output.strip()
+        logger.error(f"📋 {username}: Erro real do sistema")
+        return user_data
+
+    # ---------------------------------------------------------------
+    # Parsing linha a linha
+    # ---------------------------------------------------------------
+    has_online_data = False
+
+    for line in output.split("\n"):
+        line = line.strip()
+        if not line:
+            continue
+
+        # ---- Indicadores de usuário online ----
+        online_triggers = [
+            "User access interface",
+            "User IP address",
+            "Online time",
+            "Realtime speed",
+            "Access start time",
+            "Accounting start time",
+        ]
+        for trigger in online_triggers:
+            if trigger in line:
+                user_data["status"] = "ONLINE"
+                has_online_data = True
+                break
+
+        # ---- Extração de campos ----
+
+        # Identificação
+        if "User access index" in line:
+            user_data["access_index"] = _extract(line)
+
+        elif "User name" in line and "Domain" not in line:
+            val = _extract(line)
+            if val and val != "-":
+                user_data["username"] = val
+
+        elif "Domain name" in line:
+            user_data["domain"] = _extract(line)
+
+        # Rede IPv4
+        elif "User IP address" in line:
+            user_data["ip_address"] = _extract(line)
+
+        elif "User IP netmask" in line:
+            user_data["netmask"] = _extract(line)
+
+        elif "User gateway address" in line:
+            user_data["gateway"] = _extract(line)
+
+        elif "User Primary-DNS" in line:
+            user_data["primary_dns"] = _extract(line)
+
+        elif "User Secondary-DNS" in line:
+            user_data["secondary_dns"] = _extract(line)
+
+        # Rede IPv6
+        elif "User Authen IP Type" in line:
+            user_data["ipv6_authen_type"] = _extract(line)
+
+        elif "User IPv6 InterfaceID" in line:
+            user_data["ipv6_interface_id"] = _extract(line)
+
+        elif "User IPv6 linkLocal address" in line or "User IPv6 link-local" in line:
+            user_data["ipv6_link_local"] = _extract(line)
+
+        elif "User IPv6 NDRA Prefix" in line:
+            user_data["ipv6_ndra_prefix"] = _extract(line)
+
+        elif "User IPv6 PD Prefix" in line:
+            user_data["ipv6_pd_prefix"] = _extract(line)
+
+        elif "IPv6 DUID" in line:
+            user_data["ipv6_duid"] = _extract(line)
+
+        elif "User IPv6 Primary-DNS" in line:
+            user_data["ipv6_primary_dns"] = _extract(line)
+
+        elif "User IPv6 Secondary-DNS" in line:
+            user_data["ipv6_secondary_dns"] = _extract(line)
+
+        elif "User IPv6 lease" in line and "Remain" not in line:
+            user_data["ipv6_lease"] = _extract(line)
+
+        elif "Remain IPv6 lease" in line or "Remain lease" in line:
+            user_data["remain_lease"] = _extract(line)
+
+        elif "IPv6 MTU" in line:
+            user_data["ipv6_mtu"] = _extract(line)
+
+        # Sessão
+        elif "User access interface" in line:
+            user_data["interface"] = _extract(line)
+
+        elif "User MAC" in line:
+            user_data["mac_address"] = _extract(line)
+
+        elif "User access PeVlan" in line or "PeVlan" in line:
+            user_data["vlan"] = _extract(line)
+
+        elif "User access type" in line:
+            user_data["access_type"] = _extract(line)
+
+        elif "User access slot" in line:
+            user_data["access_slot"] = _extract(line)
+
+        elif "Online time" in line:
+            # Formato NE8000: "Online time (h:min:sec)       : 61:18:02"
+            # Extrair apenas o valor HH:MM:SS após o último ':'
+            m = re.search(r"(\d+:\d{2}:\d{2})\s*$", line)
+            if m:
+                raw = m.group(1).strip()
+            else:
+                raw = _extract(line)
+            user_data["online_time_raw"] = raw
+            user_data["online_time"] = raw
+            user_data["online_time_formatted"] = format_online_time(raw)
+
+        elif "Access start time" in line:
+            user_data["access_start_time"] = _extract(line)
+
+        elif "Accounting start time" in line:
+            user_data["accounting_start_time"] = _extract(line)
+
+        elif "Accounting session ID" in line:
+            user_data["accounting_session_id"] = _extract(line)
+
+        # QoS
+        elif "Inbound cir" in line:
+            user_data["inbound_cir"] = _extract(line)
+
+        elif "Outbound cir" in line:
+            user_data["outbound_cir"] = _extract(line)
+
+        elif "MTU" in line and "IPv6" not in line:
+            user_data["mtu"] = _extract(line)
+
+        # Velocidade em tempo real
+        elif "Realtime speed" in line and "inbound" not in line.lower() and "outbound" not in line.lower():
+            m = re.search(r":\s*(\d+)\s*kbyte/min", line)
+            if m:
+                kb = int(m.group(1))
+                mb = round(kb / 1024, 2)
+                user_data["realtime_speed"] = f"{kb} kbyte/min ({mb} MB/min)"
+                user_data["realtime_speed_kbyte"] = kb
+                user_data["realtime_speed_mb"] = mb
+
+        elif "Realtime speed inbound" in line:
+            m = re.search(r":\s*(\d+)\s*kbyte/min", line)
+            if m:
+                kb = int(m.group(1))
+                mb = round(kb / 1024, 2)
+                user_data["realtime_speed_inbound"] = f"{kb} kbyte/min ({mb} MB/min)"
+                user_data["realtime_speed_inbound_kbyte"] = kb
+                user_data["realtime_speed_inbound_mb"] = mb
+
+        elif "Realtime speed outbound" in line:
+            m = re.search(r":\s*(\d+)\s*kbyte/min", line)
+            if m:
+                kb = int(m.group(1))
+                mb = round(kb / 1024, 2)
+                user_data["realtime_speed_outbound"] = f"{kb} kbyte/min ({mb} MB/min)"
+                user_data["realtime_speed_outbound_kbyte"] = kb
+                user_data["realtime_speed_outbound_mb"] = mb
+
+        # RADIUS
+        elif "RADIUS-server-template" in line:
+            user_data["radius_server"] = _extract(line)
+
+        elif "Authen result" in line:
+            user_data["authen_result"] = _extract(line)
+
+    # ---------------------------------------------------------------
+    # Mensagem formatada final
+    # ---------------------------------------------------------------
+    if user_data["status"] == "ONLINE":
+        msg = f"🟢 Usuário {user_data['username']} está ONLINE"
+        if user_data["interface"] != "-":
+            msg += f" | Interface: {user_data['interface']}"
+        if user_data["ip_address"] != "-":
+            msg += f" | IPv4: {user_data['ip_address']}"
+        if user_data["online_time_formatted"] not in ("-", ""):
+            msg += f" | Uptime: {user_data['online_time_formatted']}"
+        elif user_data["online_time_raw"] not in ("-", ""):
+            msg += f" | Uptime: {user_data['online_time_raw']}"
+        user_data["formatted_message"] = msg
+        logger.info(f"📋 {username}: ONLINE — {msg}")
+    else:
+        user_data["status"] = "OFFLINE"
+        user_data["formatted_message"] = f"🔴 Usuário {username} está OFFLINE"
+        logger.info(f"📋 {username}: OFFLINE")
+
+    return user_data
+
 
 def parse_interfaces_output(output: str) -> List[Dict]:
-    """Parse do output de interfaces"""
+    """Parse do output de interfaces."""
     try:
         interfaces = []
-        lines = output.split('\n')
-        
-        for line in lines:
-            if 'GigabitEthernet' in line or 'Ethernet' in line:
+        for line in output.split("\n"):
+            if "GigabitEthernet" in line or "Ethernet" in line:
                 parts = line.split()
                 if len(parts) >= 3:
                     interfaces.append({
                         "name": parts[0],
                         "status": parts[1] if len(parts) > 1 else "unknown",
-                        "protocol": parts[2] if len(parts) > 2 else "unknown"
+                        "protocol": parts[2] if len(parts) > 2 else "unknown",
                     })
-        
         return interfaces
     except Exception as e:
         logger.error(f"Erro ao fazer parse interfaces: {e}")
         return []
 
+
 def parse_system_output(output: str) -> Dict:
-    """Parse do output do sistema"""
+    """Parse do output do sistema (CPU, memória)."""
     try:
         cpu = 0
         memory = 0
-        
-        lines = output.split('\n')
-        for line in lines:
+        for line in output.split("\n"):
             line = line.strip()
-            if not line:
-                continue
-                
-            if any(word in line.lower() for word in ['cpu', 'processor']):
-                cpu_match = re.search(r'(\d+)%', line)
-                if cpu_match:
-                    cpu = int(cpu_match.group(1))
-            
-            if any(word in line.lower() for word in ['memory', 'ram', 'mem']):
-                mem_match = re.search(r'(\d+)%', line)
-                if mem_match:
-                    memory = int(mem_match.group(1))
-        
-        return {
-            "cpu": cpu,
-            "memory": memory,
-            "timestamp": datetime.now().isoformat()
-        }
+            if any(w in line.lower() for w in ["cpu", "processor"]):
+                m = re.search(r"(\d+)%", line)
+                if m:
+                    cpu = int(m.group(1))
+            if any(w in line.lower() for w in ["memory", "ram", "mem"]):
+                m = re.search(r"(\d+)%", line)
+                if m:
+                    memory = int(m.group(1))
+        return {"cpu": cpu, "memory": memory, "timestamp": datetime.now().isoformat()}
     except Exception as e:
         logger.error(f"Erro ao fazer parse sistema: {e}")
         return {"cpu": 0, "memory": 0, "error": str(e)}
 
+
 def parse_pppoe_interface_output(output: str, interface: str) -> int:
-    """Parse do output PPPoE por interface"""
+    """Parse do output PPPoE por interface."""
     try:
-        lines = output.split('\n')
-        for line in lines:
-            if 'Total lines:' in line:
-                match = re.search(r'Total lines:\s*(\d+)', line)
-                if match:
-                    count = int(match.group(1))
-                    logger.info(f"PPPoE count para {interface}: {count}")
-                    return count
+        for line in output.split("\n"):
+            if "Total lines:" in line:
+                m = re.search(r"Total lines:\s*(\d+)", line)
+                if m:
+                    return int(m.group(1))
         return 0
     except Exception as e:
         logger.error(f"Erro ao fazer parse PPPoE interface: {e}")
         return 0
 
+
 def format_user_status(user_data: Dict) -> str:
-    """
-    Formatar status do usuário de forma amigável
-    """
+    """Formatar status do usuário de forma amigável."""
     username = user_data.get("username", "Unknown")
     status = user_data.get("status", "UNKNOWN")
-    
     if status == "ONLINE":
         return f"🟢 {username} está ONLINE"
     elif status == "OFFLINE":
@@ -444,33 +433,5 @@ def format_user_status(user_data: Dict) -> str:
     elif status == "NOT_FOUND":
         return f"❓ {username} não encontrado"
     elif status == "ERROR":
-        return f"❌ {username} - erro na consulta"
-    else:
-        return f"⚪ {username} - status desconhecido"
-
-def get_user_summary(user_data: Dict) -> Dict:
-    """
-    Gerar resumo do usuário
-    """
-    return {
-        "username": user_data.get("username", "Unknown"),
-        "status": user_data.get("status", "UNKNOWN"),
-        "formatted_message": user_data.get("formatted_message", ""),
-        "interface": user_data.get("interface", "-"),
-        "ip_address": user_data.get("ip_address", "-"),
-        "online_time": user_data.get("online_time", "-"),
-        "is_online": user_data.get("status") == "ONLINE",
-        "has_error": user_data.get("status") == "ERROR"
-    }
-
-# Teste rápido da função
-time_str = "659:48:02"
-parts = time_str.split(':')
-total_hours = int(parts[0])  # 659
-minutes = int(parts[1])      # 48  
-seconds = int(parts[2])      # 2
-
-days = total_hours // 24     # 659 ÷ 24 = 27 dias
-hours = total_hours % 24     # 659 % 24 = 11 horas
-
-# Resultado: "27 dias, 11 horas, 48 minutos e 2 segundos" 
+        return f"❌ {username} — erro na consulta"
+    return f"⚪ {username} — status desconhecido"

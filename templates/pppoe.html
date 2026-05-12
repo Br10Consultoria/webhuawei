@@ -2,22 +2,25 @@
 
 {% block content %}
 <div class="max-w-7xl mx-auto space-y-6">
+
     <!-- Painel Principal de PPPoE -->
     <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
         <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 space-y-4 lg:space-y-0">
-            <h2 class="text-2xl font-semibold text-gray-800">PPPoE BNG Management</h2>
-            
-            <!-- Estatísticas Principais -->
-            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <h2 class="text-2xl font-semibold text-gray-800">PPPoE BNG — Huawei NE8000</h2>
+            <div class="grid grid-cols-2 lg:grid-cols-3 gap-4">
                 <div class="bg-blue-50 p-4 rounded-lg border border-blue-200 text-center">
                     <div class="text-blue-600 text-xs font-medium">Total Online</div>
                     <div class="text-2xl font-bold text-blue-800" id="totalOnline">-</div>
                     <div class="text-xs text-blue-600 mt-1" id="lastUpdate">Carregando...</div>
                 </div>
                 <div class="bg-orange-50 p-4 rounded-lg border border-orange-200 text-center">
-                    <div class="text-orange-600 text-xs font-medium">Status</div>
+                    <div class="text-orange-600 text-xs font-medium">Roteador</div>
                     <div class="text-sm font-bold text-orange-800" id="connectionStatus">Conectando...</div>
                     <button onclick="refreshAllData()" class="text-xs text-orange-600 hover:text-orange-800 mt-1">🔄 Refresh</button>
+                </div>
+                <div class="bg-green-50 p-4 rounded-lg border border-green-200 text-center">
+                    <div class="text-green-600 text-xs font-medium">Protocolo</div>
+                    <div class="text-sm font-bold text-green-800" id="protocolStatus">-</div>
                 </div>
             </div>
         </div>
@@ -25,643 +28,536 @@
 
     <!-- Consulta Individual de Usuário -->
     <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-        <h3 class="text-lg font-semibold text-gray-800 mb-4">🔍 Consulta Individual</h3>
-        
-        <div class="space-y-4" id="pppoeForm">
-            <div class="flex flex-col md:flex-row gap-4">
-                <div class="flex-1">
-                    <input type="text" 
-                           name="username" 
-                           id="usernameInput"
-                           placeholder="Digite o username PPPoE para análise detalhada..."
-                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
-                </div>
-                <div class="flex space-x-2">
-                    <button onclick="analyzeUser()" 
-                            class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                            id="analyzeBtn">
-                        🔍 Analisar Usuário
-                    </button>
-                    <button onclick="clearUserData()" 
-                            class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors"
-                            id="clearBtn" style="display: none;">
-                        🗑️ Limpar
-                    </button>
-                </div>
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">🔍 Consulta de Usuário PPPoE</h3>
+        <div class="flex flex-col md:flex-row gap-4">
+            <div class="flex-1">
+                <input type="text"
+                       id="usernameInput"
+                       placeholder="Digite o username PPPoE (ex: jose@provedor.com.br)..."
+                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
             </div>
-            
-            <!-- Mensagem de status da consulta -->
-            <div id="queryStatus" class="hidden mt-4"></div>
+            <div class="flex space-x-2">
+                <button onclick="analyzeUser()"
+                        class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                        id="analyzeBtn">
+                    🔍 Consultar
+                </button>
+                <button onclick="clearUserData()"
+                        class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors"
+                        id="clearBtn" style="display: none;">
+                    🗑️ Limpar
+                </button>
+            </div>
         </div>
+        <div id="queryStatus" class="hidden mt-4"></div>
     </div>
 
-    <!-- Análise Detalhada do Usuário (Dinâmica) -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6" id="userAnalysisContainer" style="display: none;">
-        <!-- Informações da Sessão -->
-        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-            <h3 class="text-lg font-semibold text-gray-800 mb-4">Detalhes da Sessão</h3>
-            <div class="space-y-3" id="sessionDetails">
-                <div class="flex justify-between">
-                    <span class="text-gray-600">Username:</span>
-                    <span class="font-mono text-gray-800" id="displayUsername">-</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-600">Status:</span>
-                    <span class="px-2 py-1 rounded-full text-sm" id="userConnectionStatus">
-                        Verificando...
-                    </span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-600">IP Address:</span>
-                    <span class="font-mono text-gray-800" id="ipAddress">-</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-600">Interface:</span>
-                    <span class="font-mono text-gray-800" id="interface">-</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-600">Gateway:</span>
-                    <span class="font-mono text-gray-800" id="gateway">-</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-600">Online Time:</span>
-                    <span class="font-mono text-gray-800" id="onlineTime">-</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-600">IPv6 Interface ID:</span>
-                    <span class="font-mono text-gray-800" id="ipv6InterfaceId">-</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-600">IPv6 Link Local:</span>
-                    <span class="font-mono text-gray-800" id="ipv6LinkLocal">-</span>
-                </div>
-                
-                <!-- Dados de Tráfego em Tempo Real -->
-                <div class="mt-4 pt-4 border-t border-gray-200">
-                    <h4 class="text-sm font-semibold text-gray-700 mb-2">📊 Tráfego em Tempo Real</h4>
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Velocidade Total:</span>
-                        <span class="font-mono text-gray-800" id="realtimeSpeed">-</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Download:</span>
-                        <span class="font-mono text-gray-800" id="realtimeSpeedInbound">-</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Upload:</span>
-                        <span class="font-mono text-gray-800" id="realtimeSpeedOutbound">-</span>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Ações do Usuário -->
-            <div class="mt-6 space-y-2">
-                <div id="disconnectButtonContainer" style="display: none;">
-                    <button onclick="disconnectUser()" 
-                            class="w-full bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors">
-                        🔌 Desconectar Usuário
-                    </button>
-                </div>
-                <button onclick="showUserHistory()" 
-                        class="w-full bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition-colors">
-                    📊 Histórico de Conexões
-                </button>
-                <button onclick="showBandwidthGraph()" 
-                        class="w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors">
-                    📈 Gráfico de Banda
+    <!-- Resultado da Consulta -->
+    <div id="userAnalysisContainer" style="display: none;" class="space-y-6">
+
+        <!-- Linha de status + ação -->
+        <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-100 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div id="statusBadge" class="text-lg font-semibold"></div>
+            <div id="disconnectButtonContainer" style="display: none;">
+                <button onclick="disconnectUser()"
+                        class="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors font-semibold">
+                    🔌 Desconectar Usuário
                 </button>
             </div>
         </div>
 
-        <!-- IPv6 e Informações Avançadas -->
-        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-            <h3 class="text-lg font-semibold text-gray-800 mb-4">Informações IPv6</h3>
-            <div class="space-y-3" id="ipv6Details">
-                <div class="flex justify-between">
-                    <span class="text-gray-600">IPv6 NDRA Prefix:</span>
-                    <span class="font-mono text-gray-800" id="ipv6NdraPrefix">-</span>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+            <!-- Coluna Esquerda: Sessão + IPv4 -->
+            <div class="space-y-6">
+
+                <!-- Dados da Sessão -->
+                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">📋 Dados da Sessão</h3>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between border-b border-gray-50 pb-1">
+                            <span class="text-gray-500">Username</span>
+                            <span class="font-mono font-semibold text-gray-800" id="displayUsername">-</span>
+                        </div>
+                        <div class="flex justify-between border-b border-gray-50 pb-1">
+                            <span class="text-gray-500">Domínio</span>
+                            <span class="font-mono text-gray-800" id="domain">-</span>
+                        </div>
+                        <div class="flex justify-between border-b border-gray-50 pb-1">
+                            <span class="text-gray-500">Status</span>
+                            <span id="userConnectionStatus" class="px-2 py-0.5 rounded-full text-xs font-semibold">-</span>
+                        </div>
+                        <div class="flex justify-between border-b border-gray-50 pb-1">
+                            <span class="text-gray-500">Interface</span>
+                            <span class="font-mono text-gray-800" id="interface">-</span>
+                        </div>
+                        <div class="flex justify-between border-b border-gray-50 pb-1">
+                            <span class="text-gray-500">MAC Address</span>
+                            <span class="font-mono text-gray-800" id="macAddress">-</span>
+                        </div>
+                        <div class="flex justify-between border-b border-gray-50 pb-1">
+                            <span class="text-gray-500">VLAN (PeVlan/CeVlan)</span>
+                            <span class="font-mono text-gray-800" id="vlan">-</span>
+                        </div>
+                        <div class="flex justify-between border-b border-gray-50 pb-1">
+                            <span class="text-gray-500">Tipo de Acesso</span>
+                            <span class="font-mono text-gray-800" id="accessType">-</span>
+                        </div>
+                        <div class="flex justify-between border-b border-gray-50 pb-1">
+                            <span class="text-gray-500">MTU</span>
+                            <span class="font-mono text-gray-800" id="mtu">-</span>
+                        </div>
+                        <div class="flex justify-between border-b border-gray-50 pb-1">
+                            <span class="text-gray-500">Início da Conexão</span>
+                            <span class="font-mono text-gray-800" id="accessStartTime">-</span>
+                        </div>
+                        <div class="flex justify-between border-b border-gray-50 pb-1">
+                            <span class="text-gray-500">Início Accounting</span>
+                            <span class="font-mono text-gray-800" id="accountingStartTime">-</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-500 font-semibold">⏱ Uptime</span>
+                            <span class="font-mono font-bold text-blue-700" id="onlineTime">-</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-600">IPv6 PD Prefix:</span>
-                    <span class="font-mono text-gray-800" id="ipv6PdPrefix">-</span>
+
+                <!-- IPv4 -->
+                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">🌐 Endereçamento IPv4</h3>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between border-b border-gray-50 pb-1">
+                            <span class="text-gray-500">IP Address</span>
+                            <span class="font-mono font-bold text-green-700" id="ipAddress">-</span>
+                        </div>
+                        <div class="flex justify-between border-b border-gray-50 pb-1">
+                            <span class="text-gray-500">Máscara</span>
+                            <span class="font-mono text-gray-800" id="netmask">-</span>
+                        </div>
+                        <div class="flex justify-between border-b border-gray-50 pb-1">
+                            <span class="text-gray-500">Gateway</span>
+                            <span class="font-mono text-gray-800" id="gateway">-</span>
+                        </div>
+                        <div class="flex justify-between border-b border-gray-50 pb-1">
+                            <span class="text-gray-500">DNS Primário</span>
+                            <span class="font-mono text-gray-800" id="primaryDns">-</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">DNS Secundário</span>
+                            <span class="font-mono text-gray-800" id="secondaryDns">-</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-600">IPv6 DUID:</span>
-                    <span class="font-mono text-gray-800" id="ipv6Duid">-</span>
+
+                <!-- Tráfego em Tempo Real -->
+                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">📊 Tráfego em Tempo Real</h3>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between border-b border-gray-50 pb-1">
+                            <span class="text-gray-500">Velocidade Total</span>
+                            <span class="font-mono text-gray-800" id="realtimeSpeed">-</span>
+                        </div>
+                        <div class="flex justify-between border-b border-gray-50 pb-1">
+                            <span class="text-gray-500">Download (Inbound)</span>
+                            <span class="font-mono text-gray-800" id="realtimeSpeedInbound">-</span>
+                        </div>
+                        <div class="flex justify-between border-b border-gray-50 pb-1">
+                            <span class="text-gray-500">Upload (Outbound)</span>
+                            <span class="font-mono text-gray-800" id="realtimeSpeedOutbound">-</span>
+                        </div>
+                        <div class="flex justify-between border-b border-gray-50 pb-1">
+                            <span class="text-gray-500">CIR Inbound</span>
+                            <span class="font-mono text-gray-800" id="inboundCir">-</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">CIR Outbound</span>
+                            <span class="font-mono text-gray-800" id="outboundCir">-</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-600">IPv6 Primary DNS:</span>
-                    <span class="font-mono text-gray-800" id="ipv6PrimaryDns">-</span>
+
+            </div><!-- /Coluna Esquerda -->
+
+            <!-- Coluna Direita: IPv6 + RADIUS + Ações -->
+            <div class="space-y-6">
+
+                <!-- IPv6 -->
+                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">🔵 Endereçamento IPv6</h3>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between border-b border-gray-50 pb-1">
+                            <span class="text-gray-500">Tipo de Autenticação</span>
+                            <span class="font-mono text-gray-800" id="ipv6AuthenType">-</span>
+                        </div>
+                        <div class="flex justify-between border-b border-gray-50 pb-1">
+                            <span class="text-gray-500">Interface ID</span>
+                            <span class="font-mono text-gray-800" id="ipv6InterfaceId">-</span>
+                        </div>
+                        <div class="flex justify-between border-b border-gray-50 pb-1">
+                            <span class="text-gray-500">Link Local</span>
+                            <span class="font-mono text-gray-800" id="ipv6LinkLocal">-</span>
+                        </div>
+                        <div class="flex justify-between border-b border-gray-50 pb-1">
+                            <span class="text-gray-500">NDRA Prefix</span>
+                            <span class="font-mono font-bold text-blue-700" id="ipv6NdraPrefix">-</span>
+                        </div>
+                        <div class="flex justify-between border-b border-gray-50 pb-1">
+                            <span class="text-gray-500">PD Prefix</span>
+                            <span class="font-mono font-bold text-blue-700" id="ipv6PdPrefix">-</span>
+                        </div>
+                        <div class="flex justify-between border-b border-gray-50 pb-1">
+                            <span class="text-gray-500">DUID</span>
+                            <span class="font-mono text-gray-800 text-xs break-all" id="ipv6Duid">-</span>
+                        </div>
+                        <div class="flex justify-between border-b border-gray-50 pb-1">
+                            <span class="text-gray-500">DNS Primário IPv6</span>
+                            <span class="font-mono text-gray-800" id="ipv6PrimaryDns">-</span>
+                        </div>
+                        <div class="flex justify-between border-b border-gray-50 pb-1">
+                            <span class="text-gray-500">DNS Secundário IPv6</span>
+                            <span class="font-mono text-gray-800" id="ipv6SecondaryDns">-</span>
+                        </div>
+                        <div class="flex justify-between border-b border-gray-50 pb-1">
+                            <span class="text-gray-500">IPv6 Lease</span>
+                            <span class="font-mono text-gray-800" id="ipv6Lease">-</span>
+                        </div>
+                        <div class="flex justify-between border-b border-gray-50 pb-1">
+                            <span class="text-gray-500">Remain Lease</span>
+                            <span class="font-mono text-gray-800" id="remainLease">-</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">IPv6 MTU</span>
+                            <span class="font-mono text-gray-800" id="ipv6Mtu">-</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-600">IPv6 Secondary DNS:</span>
-                    <span class="font-mono text-gray-800" id="ipv6SecondaryDns">-</span>
+
+                <!-- RADIUS / AAA -->
+                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">🔐 RADIUS / AAA</h3>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between border-b border-gray-50 pb-1">
+                            <span class="text-gray-500">Servidor RADIUS</span>
+                            <span class="font-mono text-gray-800" id="radiusServer">-</span>
+                        </div>
+                        <div class="flex justify-between border-b border-gray-50 pb-1">
+                            <span class="text-gray-500">Resultado Autenticação</span>
+                            <span class="font-mono text-gray-800" id="authenResult">-</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">Session ID</span>
+                            <span class="font-mono text-gray-800 text-xs break-all" id="accountingSessionId">-</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-600">IPv6 Lease:</span>
-                    <span class="font-mono text-gray-800" id="ipv6Lease">-</span>
+
+                <!-- Ações -->
+                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">⚡ Ações</h3>
+                    <div class="space-y-3">
+                        <div id="disconnectButtonContainer2" style="display: none;">
+                            <button onclick="disconnectUser()"
+                                    class="w-full bg-red-600 text-white px-4 py-3 rounded-lg hover:bg-red-700 transition-colors font-semibold text-sm">
+                                🔌 Desconectar Usuário PPPoE
+                            </button>
+                            <p class="text-xs text-gray-500 mt-1 text-center">
+                                Executa: <code>cut access-user username &lt;user&gt; radius</code>
+                            </p>
+                        </div>
+                        <button onclick="showUserHistory()"
+                                class="w-full bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition-colors text-sm">
+                            📊 Histórico de Conexões
+                        </button>
+                        <button onclick="showBandwidthGraph()"
+                                class="w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors text-sm">
+                            📈 Gráfico de Banda
+                        </button>
+                    </div>
                 </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-600">Remain Lease:</span>
-                    <span class="font-mono text-gray-800" id="remainLease">-</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-600">IPv6 MTU:</span>
-                    <span class="font-mono text-gray-800" id="ipv6Mtu">-</span>
+
+            </div><!-- /Coluna Direita -->
+
+        </div><!-- /grid -->
+
+        <!-- Output Raw -->
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100" id="rawOutputSection">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-gray-800">🖥 Output Completo do Roteador</h3>
+                <div class="space-x-2">
+                    <button onclick="toggleRawOutput()"
+                            class="text-sm bg-gray-100 text-gray-700 px-3 py-1 rounded hover:bg-gray-200 transition-colors">
+                        Mostrar/Ocultar
+                    </button>
+                    <button onclick="copyRawOutput()"
+                            class="text-sm bg-blue-100 text-blue-700 px-3 py-1 rounded hover:bg-blue-200 transition-colors">
+                        📋 Copiar
+                    </button>
                 </div>
             </div>
-    <!-- Terminal Output (Raw) - Dinâmico -->
-    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100" id="rawOutputSection" style="display: none;">
-        <div class="flex justify-between items-center mb-4">
-            <h3 class="text-lg font-semibold text-gray-800">Output Completo da Consulta</h3>
-            <div class="space-x-2">
-                <button onclick="toggleRawOutput()" 
-                        class="text-sm bg-gray-100 text-gray-700 px-3 py-1 rounded hover:bg-gray-200 transition-colors">
-                    Toggle View
-                </button>
-                <button onclick="copyRawOutput()" 
-                        class="text-sm bg-blue-100 text-blue-700 px-3 py-1 rounded hover:bg-blue-200 transition-colors">
-                    📋 Copiar
-                </button>
+            <div class="bg-gray-900 rounded-lg overflow-hidden" id="rawOutputContainer">
+                <div class="max-h-96 overflow-auto p-4">
+                    <pre class="whitespace-pre-wrap text-green-400 text-sm font-mono" id="rawOutputContent"></pre>
+                </div>
             </div>
         </div>
-        <div class="bg-gray-900 rounded-lg overflow-hidden" id="rawOutputContainer">
-            <div class="max-h-96 overflow-auto p-4">
-                <pre class="whitespace-pre-wrap text-green-400 text-sm font-mono" id="rawOutputContent"></pre>
-            </div>
-        </div>
-    </div>
-</div>
+
+    </div><!-- /userAnalysisContainer -->
+
+</div><!-- /max-w-7xl -->
 
 <script>
-let autoRefreshInterval;
+let currentUser = null;
+let autoRefreshInterval = null;
+let isRawOutputVisible = true;
 
-// Carregar dados iniciais
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     refreshAllData();
     startAutoRefresh();
+    document.getElementById('usernameInput').addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') analyzeUser();
+    });
 });
 
+function startAutoRefresh() {
+    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+    autoRefreshInterval = setInterval(loadGeneralStats, 30000);
+}
+
 async function refreshAllData() {
-    await Promise.all([
-        loadGeneralStats(),
-        loadInterfaceData()
-    ]);
+    await Promise.all([loadGeneralStats(), loadConnectionStatus()]);
 }
 
 async function loadGeneralStats() {
     try {
-        const response = await fetch('/api/online_total');
-        const data = await response.json();
-        
+        const resp = await fetch('/api/online_total');
+        const data = await resp.json();
         if (data.success) {
-            document.getElementById('totalOnline').textContent = data.total || 0;
-            document.getElementById('connectionStatus').textContent = 'Conectado';
-            
-            const now = new Date();
-            document.getElementById('lastUpdate').textContent = 
-                `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-        } else {
-            document.getElementById('connectionStatus').textContent = 'Erro';
-            document.getElementById('totalOnline').textContent = '0';
+            document.getElementById('totalOnline').textContent = data.total ?? '-';
+            document.getElementById('lastUpdate').textContent = 'Atualizado: ' + new Date().toLocaleTimeString('pt-BR');
         }
-    } catch (error) {
-        console.error('Erro ao carregar estatísticas gerais:', error);
-        document.getElementById('connectionStatus').textContent = 'Offline';
+    } catch (e) {
+        document.getElementById('totalOnline').textContent = 'Erro';
     }
 }
 
-async function loadInterfaceData() {
+async function loadConnectionStatus() {
     try {
-        const response = await fetch('/api/pppoe_by_interface');
-        const data = await response.json();
-        
-        if (data.success) {
-            displayInterfaceData(data.interfaces);
-            updateInterfaceStats(data.interfaces);
+        const resp = await fetch('/api/connection_status');
+        const data = await resp.json();
+        const el = document.getElementById('connectionStatus');
+        const proto = document.getElementById('protocolStatus');
+        if (data.connected) {
+            el.textContent = '✅ Conectado';
+            el.className = 'text-sm font-bold text-green-700';
         } else {
-            document.getElementById('interfacesList').innerHTML = 
-                '<div class="text-center text-red-500 py-4">Erro ao carregar dados das interfaces</div>';
+            el.textContent = '❌ Desconectado';
+            el.className = 'text-sm font-bold text-red-700';
         }
-    } catch (error) {
-        console.error('Erro ao carregar dados das interfaces:', error);
-        document.getElementById('interfacesList').innerHTML = 
-            '<div class="text-center text-red-500 py-4">Erro de conexão</div>';
+        proto.textContent = (data.protocol || 'SSH').toUpperCase() + ' — ' + (data.host || '-');
+    } catch (e) {
+        document.getElementById('connectionStatus').textContent = 'Erro';
     }
 }
 
-function displayInterfaceData(interfaces) {
-    const container = document.getElementById('interfacesList');
-    
-    if (!interfaces || interfaces.length === 0) {
-        container.innerHTML = '<div class="text-center text-gray-500 py-4">Nenhuma interface com usuários encontrada</div>';
-        return;
-    }
-    
-    let html = '';
-    
-    interfaces.forEach(iface => {
-        html += `
-            <div class="border border-gray-200 rounded-lg p-4">
-                <div class="flex justify-between items-center mb-3">
-                    <div class="flex items-center space-x-3">
-                        <div class="w-3 h-3 bg-green-500 rounded-full"></div>
-                        <h4 class="font-semibold text-gray-800">${iface.interface}</h4>
-                        <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm font-medium">
-                            ${iface.total} usuários
-                        </span>
-                    </div>
-                    <button onclick="refreshInterface('${iface.interface}')" 
-                            class="text-gray-400 hover:text-gray-600">
-                        🔄
-                    </button>
-                </div>
-                
-                ${iface.vlans && iface.vlans.length > 0 ? `
-                    <div class="ml-6 space-y-2">
-                        <div class="text-sm text-gray-600 font-medium">VLANs:</div>
-                        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                            ${iface.vlans.map(vlan => `
-                                <div class="bg-gray-50 px-3 py-2 rounded text-sm">
-                                    <div class="font-medium">.${vlan.vlan}</div>
-                                    <div class="text-gray-600">${vlan.count} users</div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                ` : ''}
-            </div>
-        `;
-    });
-    
-    container.innerHTML = html;
-}
-
-function updateInterfaceStats(interfaces) {
-    const totalInterfaces = interfaces.length;
-    const totalVlans = interfaces.reduce((sum, iface) => sum + (iface.vlans ? iface.vlans.length : 0), 0);
-    
-    // Encontrar interface com mais usuários
-    let topInterface = null;
-    let maxUsers = 0;
-    
-    interfaces.forEach(iface => {
-        if (iface.total > maxUsers) {
-            maxUsers = iface.total;
-            topInterface = iface.interface;
-        }
-    });
-    
-    document.getElementById('activeInterfaces').textContent = totalInterfaces;
-    document.getElementById('totalVlans').textContent = `${totalVlans} VLANs`;
-    
-    if (topInterface) {
-        document.getElementById('topInterface').textContent = topInterface;
-        document.getElementById('topInterfaceCount').textContent = `${maxUsers} users`;
-    }
-}
-
-async function refreshInterface(interfaceName) {
-    // Implementar refresh específico de uma interface
-    console.log(`Refreshing interface: ${interfaceName}`);
-    await loadInterfaceData();
-}
-
-function startAutoRefresh() {
-    // Auto-refresh a cada 60 segundos APENAS se a página estiver visível
-    if (autoRefreshInterval) {
-        clearInterval(autoRefreshInterval);
-    }
-    
-    autoRefreshInterval = setInterval(() => {
-        // Só fazer refresh se a página estiver visível e ativa
-        if (!document.hidden && document.hasFocus()) {
-            console.log('Auto-refresh ativado - página visível');
-            refreshAllData();
-        } else {
-            console.log('Auto-refresh pausado - página não visível');
-        }
-    }, 60000);
-    
-    // Pausar auto-refresh quando a página não estiver visível
-    document.addEventListener('visibilitychange', function() {
-        if (document.hidden) {
-            console.log('Página escondida - pausando auto-refresh');
-        } else {
-            console.log('Página visível - retomando auto-refresh');
-        }
-    });
-}
-
-// Variável global para armazenar o usuário atual
-let currentUser = null;
-
-// Função principal para analisar usuário
 async function analyzeUser() {
     const username = document.getElementById('usernameInput').value.trim();
-    
     if (!username) {
-        showMessage('Por favor, digite um username para consulta.', 'error');
+        showQueryStatus('Por favor, informe o username PPPoE.', 'error');
         return;
     }
-    
-    // Atualizar botões
-    document.getElementById('analyzeBtn').disabled = true;
-    document.getElementById('analyzeBtn').innerHTML = '🔍 Consultando...';
-    
+
+    const btn = document.getElementById('analyzeBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Consultando...';
+    showQueryStatus('Consultando roteador...', 'info');
+
     try {
-        // Fazer a consulta via API
         const formData = new FormData();
         formData.append('username', username);
-        
-        const response = await fetch('/api/pppoe_query', {
-            method: 'POST',
-            body: formData
-        });
-        
-        const data = await response.json();
-        
+
+        const resp = await fetch('/api/pppoe_query', { method: 'POST', body: formData });
+        const data = await resp.json();
+
         if (data.success) {
             currentUser = data;
-            displayUserData(data);
-            showMessage(`Usuário ${username} consultado com sucesso!`, 'success');
-            
-            // Mostrar container de análise e botão de limpar
+            renderUserData(data);
             document.getElementById('userAnalysisContainer').style.display = 'block';
             document.getElementById('clearBtn').style.display = 'inline-block';
+            hideQueryStatus();
         } else {
-            showMessage(`Erro ao consultar usuário: ${data.error || 'Usuário não encontrado'}`, 'error');
-            hideUserData();
+            showQueryStatus('Erro: ' + (data.error || 'Falha na consulta'), 'error');
         }
-        
-    } catch (error) {
-        console.error('Erro na consulta:', error);
-        showMessage('Erro de conexão ao consultar usuário.', 'error');
-        hideUserData();
+    } catch (e) {
+        showQueryStatus('Erro de comunicação: ' + e.message, 'error');
     } finally {
-        // Restaurar botão
-        document.getElementById('analyzeBtn').disabled = false;
-        document.getElementById('analyzeBtn').innerHTML = '🔍 Analisar Usuário';
+        btn.disabled = false;
+        btn.textContent = '🔍 Consultar';
     }
 }
 
-// Função para exibir dados do usuário
-function displayUserData(data) {
-    // Informações básicas
-    document.getElementById('displayUsername').textContent = data.username || '-';
-    document.getElementById('ipAddress').textContent = data.ip_address || '-';
-    document.getElementById('interface').textContent = data.interface || '-';
-    document.getElementById('gateway').textContent = data.gateway || '-';
-    document.getElementById('onlineTime').textContent = data.online_time || '-';
-    
-    // Status do usuário
-    const statusElement = document.getElementById('userConnectionStatus');
-    if (data.status === 'ONLINE') {
-        statusElement.textContent = 'ONLINE';
-        statusElement.className = 'px-2 py-1 rounded-full text-sm bg-green-100 text-green-800';
-        document.getElementById('disconnectButtonContainer').style.display = 'block';
+function renderUserData(data) {
+    const isOnline = data.status === 'ONLINE';
+
+    // Badge de status
+    const badge = document.getElementById('statusBadge');
+    if (isOnline) {
+        badge.innerHTML = '<span class="text-green-700">🟢 ONLINE</span> — ' + (data.username || '-');
     } else {
-        statusElement.textContent = 'OFFLINE';
-        statusElement.className = 'px-2 py-1 rounded-full text-sm bg-red-100 text-red-800';
-        document.getElementById('disconnectButtonContainer').style.display = 'none';
+        badge.innerHTML = '<span class="text-red-700">🔴 OFFLINE</span> — ' + (data.username || '-');
     }
-    
-    // Informações IPv6
-    document.getElementById('ipv6InterfaceId').textContent = data.ipv6_interface_id || '-';
-    document.getElementById('ipv6LinkLocal').textContent = data.ipv6_link_local || '-';
-    document.getElementById('ipv6NdraPrefix').textContent = data.ipv6_ndra_prefix || '-';
-    document.getElementById('ipv6PdPrefix').textContent = data.ipv6_pd_prefix || '-';
-    document.getElementById('ipv6Duid').textContent = data.ipv6_duid || '-';
-    document.getElementById('ipv6PrimaryDns').textContent = data.ipv6_primary_dns || '-';
-    document.getElementById('ipv6SecondaryDns').textContent = data.ipv6_secondary_dns || '-';
-    document.getElementById('ipv6Lease').textContent = data.ipv6_lease || '-';
-    document.getElementById('remainLease').textContent = data.remain_lease || '-';
-    document.getElementById('ipv6Mtu').textContent = data.ipv6_mtu || '-';
-    
-    // Dados de tráfego em tempo real
-    document.getElementById('realtimeSpeed').textContent = data.realtime_speed || '-';
-    document.getElementById('realtimeSpeedInbound').textContent = data.realtime_speed_inbound || '-';
-    document.getElementById('realtimeSpeedOutbound').textContent = data.realtime_speed_outbound || '-';
-    
-    // Mostrar raw output se disponível
-    if (data.raw_output) {
-        document.getElementById('rawOutputContent').textContent = data.raw_output;
-        document.getElementById('rawOutputSection').style.display = 'block';
+
+    // Botão de desconexão (visível apenas quando online)
+    const dcBtn = document.getElementById('disconnectButtonContainer');
+    const dcBtn2 = document.getElementById('disconnectButtonContainer2');
+    dcBtn.style.display = isOnline ? 'block' : 'none';
+    dcBtn2.style.display = isOnline ? 'block' : 'none';
+
+    // Status badge
+    const statusEl = document.getElementById('userConnectionStatus');
+    if (isOnline) {
+        statusEl.textContent = 'ONLINE';
+        statusEl.className = 'px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800';
     } else {
-        document.getElementById('rawOutputSection').style.display = 'none';
+        statusEl.textContent = 'OFFLINE';
+        statusEl.className = 'px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800';
     }
+
+    // Sessão
+    setText('displayUsername', data.username);
+    setText('domain', data.domain);
+    setText('interface', data.interface);
+    setText('macAddress', data.mac_address);
+    setText('vlan', data.vlan);
+    setText('accessType', data.access_type);
+    setText('mtu', data.mtu);
+    setText('accessStartTime', data.access_start_time);
+    setText('accountingStartTime', data.accounting_start_time);
+
+    // Uptime — exibir formatado se disponível, senão raw
+    const uptime = data.online_time_formatted && data.online_time_formatted !== '-'
+        ? data.online_time_formatted
+        : (data.online_time_raw || data.online_time || '-');
+    setText('onlineTime', uptime);
+
+    // IPv4
+    setText('ipAddress', data.ip_address);
+    setText('netmask', data.netmask);
+    setText('gateway', data.gateway);
+    setText('primaryDns', data.primary_dns);
+    setText('secondaryDns', data.secondary_dns);
+
+    // Tráfego
+    setText('realtimeSpeed', data.realtime_speed);
+    setText('realtimeSpeedInbound', data.realtime_speed_inbound);
+    setText('realtimeSpeedOutbound', data.realtime_speed_outbound);
+    setText('inboundCir', data.inbound_cir);
+    setText('outboundCir', data.outbound_cir);
+
+    // IPv6
+    setText('ipv6AuthenType', data.ipv6_authen_type);
+    setText('ipv6InterfaceId', data.ipv6_interface_id);
+    setText('ipv6LinkLocal', data.ipv6_link_local);
+    setText('ipv6NdraPrefix', data.ipv6_ndra_prefix);
+    setText('ipv6PdPrefix', data.ipv6_pd_prefix);
+    setText('ipv6Duid', data.ipv6_duid);
+    setText('ipv6PrimaryDns', data.ipv6_primary_dns);
+    setText('ipv6SecondaryDns', data.ipv6_secondary_dns);
+    setText('ipv6Lease', data.ipv6_lease);
+    setText('remainLease', data.remain_lease);
+    setText('ipv6Mtu', data.ipv6_mtu);
+
+    // RADIUS
+    setText('radiusServer', data.radius_server);
+    setText('authenResult', data.authen_result);
+    setText('accountingSessionId', data.accounting_session_id);
+
+    // Raw output
+    const rawContent = document.getElementById('rawOutputContent');
+    rawContent.textContent = data.raw_output || '';
 }
 
-// Função para limpar dados do usuário
+function setText(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = (value && value !== '' && value !== 'None') ? value : '-';
+}
+
 function clearUserData() {
     currentUser = null;
+    document.getElementById('userAnalysisContainer').style.display = 'none';
+    document.getElementById('clearBtn').style.display = 'none';
     document.getElementById('usernameInput').value = '';
-    document.getElementById('userAnalysisContainer').style.display = 'none';
-    document.getElementById('clearBtn').style.display = 'none';
-    hideMessage();
+    hideQueryStatus();
 }
 
-// Função para ocultar dados do usuário
-function hideUserData() {
-    document.getElementById('userAnalysisContainer').style.display = 'none';
-    document.getElementById('clearBtn').style.display = 'none';
+async function disconnectUser() {
+    if (!currentUser || !currentUser.username) {
+        showQueryStatus('Nenhum usuário selecionado.', 'error');
+        return;
+    }
+
+    const username = currentUser.username;
+    if (!confirm(`Confirma a desconexão do usuário "${username}"?\n\nComando que será executado:\n  system-view → aaa → cut access-user username ${username} radius`)) {
+        return;
+    }
+
+    showQueryStatus(`Desconectando ${username}...`, 'info');
+
+    try {
+        const formData = new FormData();
+        formData.append('username', username);
+
+        const resp = await fetch('/api/pppoe_disconnect', { method: 'POST', body: formData });
+        const data = await resp.json();
+
+        if (data.success) {
+            showQueryStatus(`✅ ${data.message || 'Usuário desconectado com sucesso!'}`, 'success');
+            setTimeout(() => analyzeUser(), 2500);
+        } else {
+            showQueryStatus(`❌ Erro ao desconectar: ${data.error || 'Erro desconhecido'}`, 'error');
+        }
+    } catch (e) {
+        showQueryStatus('Erro de comunicação: ' + e.message, 'error');
+    }
 }
 
-// Função para mostrar mensagens
-function showMessage(message, type) {
-    const statusDiv = document.getElementById('queryStatus');
-    statusDiv.className = `mt-4 p-3 rounded-lg text-sm ${type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`;
-    statusDiv.textContent = message;
-    statusDiv.classList.remove('hidden');
+function showQueryStatus(msg, type) {
+    const el = document.getElementById('queryStatus');
+    el.classList.remove('hidden');
+    const colors = {
+        success: 'bg-green-50 border-green-200 text-green-800',
+        error: 'bg-red-50 border-red-200 text-red-800',
+        info: 'bg-blue-50 border-blue-200 text-blue-800',
+    };
+    el.className = `mt-4 p-3 rounded-lg border text-sm ${colors[type] || colors.info}`;
+    el.textContent = msg;
 }
 
-// Função para ocultar mensagens
-function hideMessage() {
+function hideQueryStatus() {
     document.getElementById('queryStatus').classList.add('hidden');
 }
 
-// Função para desconectar usuário
-async function disconnectUser() {
-    if (!currentUser || !currentUser.username) {
-        showMessage('Nenhum usuário selecionado para desconectar.', 'error');
-        return;
-    }
-    
-    if (!confirm(`Tem certeza que deseja desconectar o usuário ${currentUser.username}?`)) {
-        return;
-    }
-    
-    try {
-        const formData = new FormData();
-        formData.append('username', currentUser.username);
-        
-        const response = await fetch('/api/pppoe_disconnect', {
-            method: 'POST',
-            body: formData
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            showMessage(`Usuário ${currentUser.username} desconectado com sucesso!`, 'success');
-            // Recarregar dados do usuário após desconexão
-            setTimeout(() => {
-                analyzeUser();
-            }, 2000);
-        } else {
-            showMessage(`Erro ao desconectar usuário: ${data.error || 'Erro desconhecido'}`, 'error');
-        }
-        
-    } catch (error) {
-        console.error('Erro ao desconectar usuário:', error);
-        showMessage('Erro de conexão ao desconectar usuário.', 'error');
-    }
-}
-
-// Funções para análise individual de usuário
-async function checkUserSession() {
-    if (!currentUser) {
-        showMessage('Nenhum usuário selecionado.', 'error');
-        return;
-    }
-    
-    showMessage('Verificando sessão...', 'success');
-    // Recarregar dados do usuário
-    const originalUsername = currentUser.username;
-    document.getElementById('usernameInput').value = originalUsername;
-    await analyzeUser();
-}
-
-async function checkUserInterface() {
-    if (!currentUser) {
-        showMessage('Nenhum usuário selecionado.', 'error');
-        return;
-    }
-    
-    showMessage(`Verificando interface ${currentUser.interface || 'N/A'}...`, 'success');
-    // Implementar verificação específica da interface
-    console.log(`Checking interface for: ${currentUser.username}`);
-}
-
-async function checkUserARP() {
-    if (!currentUser) {
-        showMessage('Nenhum usuário selecionado.', 'error');
-        return;
-    }
-    
-    showMessage(`Verificando ARP para IP ${currentUser.ip_address || 'N/A'}...`, 'success');
-    // Implementar verificação ARP específica
-    console.log(`Checking ARP for: ${currentUser.username}`);
-}
-
-// Adicionar handler para Enter no input
-document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('usernameInput').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            analyzeUser();
-        }
-    });
-});
-
-let isRawOutputVisible = true;
-
 function toggleRawOutput() {
     const container = document.getElementById('rawOutputContainer');
-    if (isRawOutputVisible) {
-        container.style.display = 'none';
-        isRawOutputVisible = false;
-    } else {
-        container.style.display = 'block';
-        isRawOutputVisible = true;
-    }
+    isRawOutputVisible = !isRawOutputVisible;
+    container.style.display = isRawOutputVisible ? 'block' : 'none';
 }
 
 function copyRawOutput() {
     const rawContent = document.getElementById('rawOutputContent').textContent;
-    if (!rawContent) {
-        showMessage('Nenhum conteúdo para copiar.', 'error');
-        return;
-    }
-    
+    if (!rawContent) { showQueryStatus('Nenhum conteúdo para copiar.', 'error'); return; }
     navigator.clipboard.writeText(rawContent).then(() => {
-        showMessage('Conteúdo copiado para a área de transferência!', 'success');
-        // Ocultar mensagem após 2 segundos
-        setTimeout(() => {
-            hideMessage();
-        }, 2000);
-    }).catch(err => {
-        console.error('Erro ao copiar:', err);
-        showMessage('Erro ao copiar conteúdo.', 'error');
-    });
-}
-
-function copyRawOutput() {
-    const rawContent = document.getElementById('rawOutputContent').textContent;
-    if (!rawContent) {
-        showMessage('Nenhum conteúdo para copiar.', 'error');
-        return;
-    }
-    
-    navigator.clipboard.writeText(rawContent).then(() => {
-        showMessage('Conteúdo copiado para a área de transferência!', 'success');
-        // Ocultar mensagem após 2 segundos
-        setTimeout(() => {
-            hideMessage();
-        }, 2000);
-    }).catch(err => {
-        console.error('Erro ao copiar:', err);
-        showMessage('Erro ao copiar conteúdo.', 'error');
-    });
-}
-
-async function exportToPDF() {
-    const username = document.getElementById('usernameInput').value;
-    if (!username) {
-        alert('Nenhum usuário selecionado para exportar.');
-        return;
-    }
-    
-    try {
-        const response = await fetch(`/api/export_pppoe_pdf/${username}`, {
-            method: 'POST'
-        });
-        
-        if (response.ok) {
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `pppoe_analysis_${username}_${new Date().toISOString().slice(0,10)}.pdf`;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-        } else {
-            alert('Erro ao gerar PDF');
-        }
-    } catch (error) {
-        console.error('Erro ao exportar PDF:', error);
-        alert('Erro ao exportar PDF');
-    }
+        showQueryStatus('✅ Conteúdo copiado!', 'success');
+        setTimeout(hideQueryStatus, 2000);
+    }).catch(() => showQueryStatus('Erro ao copiar.', 'error'));
 }
 
 function showUserHistory() {
-    if (!currentUser || !currentUser.username) {
-        showMessage('Nenhum usuário selecionado.', 'error');
-        return;
-    }
-    
-    // Implementar modal ou nova página para histórico
+    if (!currentUser) { showQueryStatus('Nenhum usuário selecionado.', 'error'); return; }
     window.open(`/pppoe_history/${currentUser.username}`, '_blank');
 }
 
 function showBandwidthGraph() {
-    if (!currentUser || !currentUser.username) {
-        showMessage('Nenhum usuário selecionado.', 'error');
-        return;
-    }
-    
-    // Implementar modal ou nova página para gráfico detalhado
+    if (!currentUser) { showQueryStatus('Nenhum usuário selecionado.', 'error'); return; }
     window.open(`/bandwidth_graph/${currentUser.username}`, '_blank');
 }
 </script>

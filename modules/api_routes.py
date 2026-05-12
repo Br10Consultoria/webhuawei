@@ -30,12 +30,13 @@ async def get_online_total():
         return {"success": False, "error": str(e), "total": 0, "active": 0}
 
 async def get_connection_status():
-    """Status da conexão SSH"""
+    """Status da conexão SSH/Telnet"""
     ssh_conn = get_ssh_connection()
     return {
         "connected": ssh_conn.connected,
         "host": ssh_conn.host,
         "port": ssh_conn.port,
+        "protocol": ssh_conn.protocol,
         "timestamp": datetime.now().isoformat()
     }
 
@@ -157,8 +158,8 @@ async def pppoe_disconnect(username: str = Form(...)):
             "username": username,
             "commands_executed": [
                 "system-view",
-                "aaa", 
-                f"cut access-user username {username} all"
+                "aaa",
+                f"cut access-user username {username} radius"
             ],
             "output": output,
             "timestamp": datetime.now().isoformat()
