@@ -31,9 +31,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Create non-root user for security
+# Create non-root user for security e diretorio de logs
 RUN useradd --create-home --shell /bin/bash app && \
+    mkdir -p /app/logs && \
     chown -R app:app /app
+
+# Variavel para o diretorio de logs de auditoria
+ENV AUDIT_LOG_DIR=/app/logs
 
 # Switch to non-root user
 USER app

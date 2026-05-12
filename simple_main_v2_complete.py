@@ -16,6 +16,7 @@ from modules.web_routes import (
     dashboard, pppoe_page, bandwidth_graph_page, pppoe_history_page,
     interfaces_pppoe_page, interfaces_traffic_page, setup_2fa_page
 )
+from modules import audit_log as _audit_log
 from modules.api_routes import (
     get_online_total, pppoe_query, pppoe_disconnect,
     get_connection_status, reconnect, bandwidth_data, pppoe_history, pppoe_by_interface
@@ -149,12 +150,12 @@ async def route_get_online_total():
 @app.post("/api/pppoe_query")
 async def route_pppoe_query(request: Request, username: str = Form(...)):
     """API: Consultar usuário PPPoE específico"""
-    return await pppoe_query(username)
+    return await pppoe_query(username, request=request)
 
 @app.post("/api/pppoe_disconnect")
-async def route_pppoe_disconnect(username: str = Form(...)):
+async def route_pppoe_disconnect(request: Request, username: str = Form(...)):
     """API: Desconectar usuário PPPoE"""
-    return await pppoe_disconnect(username)
+    return await pppoe_disconnect(username, request=request)
 
 @app.get("/api/connection_status")
 async def route_get_connection_status():
@@ -331,6 +332,30 @@ async def route_force_cache_refresh():
     except Exception as e:
         logger.error(f"Erro ao forçar refresh do cache: {e}")
         return {"success": False, "error": str(e)}
+
+@app.get("/logs", response_class=HTMLResponse)
+async def logs_page(request: Request):
+    """Pagina de logs de auditoria"""
+    if not request.session.get("logged_in"):
+        return RedirectResponse(url="/login", status_code=302)
+    context = {"request": request, "page": "logs", "username": request.session.get("username", "")}
+    return templates.TemplateResponse("logs.html", context)
+
+@app.get("/api/audit_logs")
+async def api_audit_logs(request: Request, limit: int = 300):
+    """API: Retornar logs de auditoria recentes"""
+    if not request.session.get("logged_in"):
+        return {"success": False, "error": "Unauthorized"}
+    logs = _audit_log.get_from_file(limit=limit)
+    return {"success": True, "logs": logs, "count": len(logs)}
+
+@app.get("/api/audit_stats")
+async def api_audit_stats(request: Request):
+    """API: Estatisticas dos logs de auditoria"""
+    if not request.session.get("logged_in"):
+        return {"success": False, "error": "Unauthorized"}
+    stats = _audit_log.get_stats()
+    return {"success": True, "stats": stats}
 
 @app.get("/health")
 async def route_health_check():

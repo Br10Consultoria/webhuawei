@@ -8,6 +8,8 @@ import qrcode
 import io
 import base64
 from fastapi import Request, Form
+from . import audit_log
+from .audit_log import AuditEvent, record as audit_record
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
@@ -76,6 +78,7 @@ async def login_post(request: Request, username: str = Form(...), password: str 
     web_pass = os.getenv("WEB_PASSWORD", "admin")
 
     if username != web_user or password != web_pass:
+        audit_record(AuditEvent.LOGIN_FAILURE, request=request, web_user=username, detail="Senha ou usuario incorretos", success=False)
         context = get_template_context(request, error="Usuário ou senha incorretos.", totp_enabled=_is_2fa_enabled())
         return templates.TemplateResponse("login.html", context)
 
@@ -84,17 +87,20 @@ async def login_post(request: Request, username: str = Form(...), password: str 
             context = get_template_context(request, error="Código 2FA obrigatório.", totp_enabled=True, show_totp=True, prefill_user=username)
             return templates.TemplateResponse("login.html", context)
         if not _verify_totp(totp_token.strip()):
+            audit_record(AuditEvent.LOGIN_FAILURE, request=request, web_user=username, detail="Codigo 2FA invalido ou expirado", success=False)
             context = get_template_context(request, error="Código 2FA inválido ou expirado.", totp_enabled=True, show_totp=True, prefill_user=username)
             return templates.TemplateResponse("login.html", context)
 
     request.session["logged_in"] = True
     request.session["username"] = username
     logger.info(f"Login bem-sucedido: {username}")
+    audit_record(AuditEvent.LOGIN_SUCCESS, request=request, web_user=username, detail=f"Login bem-sucedido", success=True)
     return RedirectResponse(url="/dashboard", status_code=302)
 
 
 async def logout(request: Request):
     username = request.session.get("username", "")
+    audit_record(AuditEvent.LOGOUT, request=request, web_user=username, detail="Logout", success=True)
     request.session.clear()
     logger.info(f"Logout: {username}")
     return RedirectResponse(url="/login", status_code=302)
@@ -120,6 +126,8 @@ async def setup_2fa_page(request: Request):
     img.save(buf, format="PNG")
     qr_b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
 
+    audit_record(AuditEvent.SETUP_2FA_VIEW, request=request,
+        web_user=request.session.get("username",""), detail="Visualizou pagina de configuracao 2FA", success=True)
     context = get_template_context(request, secret=secret, qr_b64=qr_b64,
         provisioning_uri=provisioning_uri, totp_enabled=_is_2fa_enabled(),
         issuer=issuer, web_user=web_user)

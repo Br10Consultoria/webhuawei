@@ -4,10 +4,12 @@ Módulo de rotas da API - APIs simplificadas (apenas PPPoE)
 
 import logging
 from datetime import datetime
-from fastapi import Form
+from fastapi import Form, Request
+from typing import Optional
 from .ssh_connection import get_ssh_connection
 from .pppoe_parser import parse_pppoe_output, parse_pppoe_user_output
 from .cache_manager import get_cached_data, set_cached_data
+from .audit_log import AuditEvent, record as audit_record
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +52,7 @@ async def reconnect():
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-async def pppoe_query(username: str = Form(...)):
+async def pppoe_query(username: str = Form(...), request: Optional[Request] = None):
     """
     Consultar usuário PPPoE específico - VERSÃO MELHORADA
     Com tratamento adequado para usuários offline
@@ -90,6 +92,11 @@ async def pppoe_query(username: str = Form(...)):
         else:
             logger.warning(f"⚠️ {user_data['formatted_message']}")
         
+        # Audit log
+        audit_record(AuditEvent.PPPOE_QUERY, request=request,
+            web_user="", detail=f"Consulta PPPoE: {username} -> {user_data['status']}",
+            success=True, extra={"pppoe_user": username, "status": user_data["status"]})
+        
         # Armazenar no cache
         set_cached_data(cache_key, user_data)
         
@@ -109,7 +116,7 @@ async def pppoe_query(username: str = Form(...)):
             "formatted_message": f"❌ Erro inesperado ao consultar {username}: {str(e)}"
         }
 
-async def pppoe_disconnect(username: str = Form(...)):
+async def pppoe_disconnect(username: str = Form(...), request: Optional[Request] = None):
     """Desconectar usuário PPPoE específico usando comandos AAA"""
     try:
         if not username or not username.strip():
@@ -152,6 +159,9 @@ async def pppoe_disconnect(username: str = Form(...)):
         cache = get_cache()
         cache.remove(cache_key)
         
+        audit_record(AuditEvent.PPPOE_DISCONNECT, request=request,
+            web_user="", detail=f"Desconexao PPPoE: {username}",
+            success=True, extra={"pppoe_user": username})
         return {
             "success": True,
             "message": success_message,
@@ -532,6 +542,9 @@ async def pppoe_interfaces_real(slot: int = 0, interface: str = "", vlan: int = 
         if m:
             count = int(m.group(1))
 
+        audit_record(AuditEvent.IFACE_COUNT, request=None,
+            web_user="", detail=f"Contagem interface {interface}{'.'+str(vlan) if vlan else ''}: {count} usuarios",
+            success=True, extra={"interface": interface, "vlan": vlan, "count": count})
         return {
             "success": True,
             "interface": interface,
