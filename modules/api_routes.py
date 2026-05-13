@@ -720,7 +720,7 @@ async def discover_physical_interfaces(slot: int = 0):
         result = await loop.run_in_executor(None, _run_discovery)
         # Salvar no cache se bem-sucedido
         if result.get("success") and result.get("interfaces"):
-            set_cached_data(cache_key, result, 300)
+            set_cached_data(cache_key, result)
         return result
     except Exception as e:
         logger.error(f"Erro ao executar discover em executor: {e}")
@@ -795,7 +795,7 @@ async def get_ip_pool_usage():
         loop = asyncio.get_event_loop()
         result = await loop.run_in_executor(None, _run_pool)
         if result.get("success"):
-            set_cached_data("ip_pool_usage", result, 120)
+            set_cached_data("ip_pool_usage", result)
         return result
     except Exception as e:
         logger.error(f"Erro ao executar ip_pool em executor: {e}")
