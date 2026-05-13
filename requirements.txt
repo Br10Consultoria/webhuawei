@@ -9,3 +9,4 @@ itsdangerous==2.1.2
 pyotp==2.9.0
 qrcode[pil]==8.2
 Pillow>=10.0.0
+psutil>=5.9.0

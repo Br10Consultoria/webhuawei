@@ -65,6 +65,20 @@
     </div>
 </div>
 
+<!-- Servidor Host -->
+<div class="card p-4 mb-5">
+    <div class="flex items-center justify-between mb-3">
+        <h3 class="section-title">Servidor Host</h3>
+        <button onclick="loadServerMetrics()" class="text-xs text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1">
+            <i class="fas fa-rotate-right text-xs"></i> Atualizar
+        </button>
+    </div>
+    <!-- Grid de métricas -->
+    <div id="serverMetricsContent">
+        <div class="text-xs text-slate-400 flex items-center gap-2"><i class="fas fa-spinner fa-spin"></i> Coletando métricas...</div>
+    </div>
+</div>
+
 <!-- Quick actions + Status -->
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
     <div class="card p-4">
@@ -220,10 +234,87 @@ async function forceRefresh() {
     } catch(e) { showMessage('Erro ao forçar refresh', 'error'); }
 }
 
+// ── Métricas do servidor ────────────────────────────────────────────────────
+function metricBar(pct, status) {
+    const color = status === 'critical' ? 'bg-red-500' : status === 'warning' ? 'bg-amber-500' : 'bg-green-500';
+    const text  = status === 'critical' ? 'text-red-600' : status === 'warning' ? 'text-amber-600' : 'text-green-600';
+    return `<div class="flex items-center gap-2">
+        <div class="flex-1 bg-slate-100 rounded-full h-1.5">
+            <div class="${color} h-1.5 rounded-full transition-all" style="width:${Math.min(pct,100)}%"></div>
+        </div>
+        <span class="font-bold ${text} w-10 text-right text-xs">${pct}%</span>
+    </div>`;
+}
+
+async function loadServerMetrics() {
+    const el = document.getElementById('serverMetricsContent');
+    try {
+        const r = await fetch('/api/system_metrics');
+        const d = await r.json();
+        if (!d.success) {
+            el.innerHTML = `<div class="text-xs text-red-500"><i class="fas fa-xmark mr-1"></i>${d.error}</div>`;
+            return;
+        }
+        el.innerHTML = `
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+            <!-- CPU -->
+            <div class="bg-slate-50 rounded-xl p-3">
+                <div class="flex items-center justify-between mb-1.5">
+                    <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">CPU</span>
+                    <i class="fas fa-microchip text-blue-500 text-xs"></i>
+                </div>
+                ${metricBar(d.cpu.percent, d.cpu.status)}
+                <div class="text-xs text-slate-400 mt-1">${d.cpu.cores_physical} físicos / ${d.cpu.cores_logical} lógicos</div>
+                <div class="text-xs text-slate-400">Load: ${d.cpu.load_1} / ${d.cpu.load_5} / ${d.cpu.load_15}</div>
+            </div>
+            <!-- Memória -->
+            <div class="bg-slate-50 rounded-xl p-3">
+                <div class="flex items-center justify-between mb-1.5">
+                    <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Memória RAM</span>
+                    <i class="fas fa-memory text-purple-500 text-xs"></i>
+                </div>
+                ${metricBar(d.memory.percent, d.memory.status)}
+                <div class="text-xs text-slate-400 mt-1">${d.memory.used} / ${d.memory.total}</div>
+                <div class="text-xs text-slate-400">Livre: ${d.memory.available}</div>
+            </div>
+            <!-- Disco -->
+            <div class="bg-slate-50 rounded-xl p-3">
+                <div class="flex items-center justify-between mb-1.5">
+                    <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Disco</span>
+                    <i class="fas fa-hard-drive text-green-500 text-xs"></i>
+                </div>
+                ${metricBar(d.disk.percent, d.disk.status)}
+                <div class="text-xs text-slate-400 mt-1">${d.disk.used} / ${d.disk.total}</div>
+                <div class="text-xs text-slate-400">Livre: ${d.disk.free}</div>
+            </div>
+            <!-- Uptime -->
+            <div class="bg-slate-50 rounded-xl p-3">
+                <div class="flex items-center justify-between mb-1.5">
+                    <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Uptime</span>
+                    <i class="fas fa-clock text-amber-500 text-xs"></i>
+                </div>
+                <div class="text-xs font-bold text-slate-800 mt-1">${d.uptime.system}</div>
+                <div class="text-xs text-slate-400">Boot: ${d.uptime.boot_time}</div>
+                <div class="text-xs text-slate-400 mt-1">App: ${d.uptime.app}</div>
+            </div>
+        </div>
+        <!-- Rede + Swap -->
+        <div class="flex flex-wrap gap-4 text-xs text-slate-500">
+            <span><i class="fas fa-arrow-up text-green-500 mr-1"></i>Enviado: <strong class="text-slate-700">${d.network.sent}</strong></span>
+            <span><i class="fas fa-arrow-down text-blue-500 mr-1"></i>Recebido: <strong class="text-slate-700">${d.network.recv}</strong></span>
+            <span><i class="fas fa-layer-group text-slate-400 mr-1"></i>Swap: <strong class="text-slate-700">${d.swap.used} / ${d.swap.total} (${d.swap.percent}%)</strong></span>
+        </div>`;
+    } catch(e) {
+        el.innerHTML = `<div class="text-xs text-red-500"><i class="fas fa-xmark mr-1"></i>Erro: ${e.message}</div>`;
+    }
+}
+
 loadDashboard();
 loadHealth();
 loadIpPool();
+loadServerMetrics();
 setInterval(loadDashboard, 60000);
 setInterval(loadIpPool, 120000);
+setInterval(loadServerMetrics, 30000);
 </script>
 {% endblock %}

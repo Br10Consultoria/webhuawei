@@ -23,6 +23,7 @@ from modules.api_routes import (
     pppoe_interfaces_real, pppoe_users_by_interface, discover_physical_interfaces,
     get_ip_pool_usage
 )
+from modules.server_metrics import get_server_metrics
 
 # Importar módulos híbridos (novos)
 try:
@@ -272,31 +273,10 @@ async def route_cache_cleanup():
 
 @app.get("/api/system_metrics")
 async def route_system_metrics():
-    """API: Métricas do sistema (CPU, RAM, etc.)"""
-    try:
-        import psutil
-        return {
-            "success": True,
-            "cpu": round(psutil.cpu_percent(interval=1), 1),
-            "memory": round(psutil.virtual_memory().percent, 1),
-            "disk": round(psutil.disk_usage('/').percent, 1),
-            "last_update": datetime.now().isoformat(),
-            "timestamp": datetime.now().isoformat()
-        }
-    except ImportError:
-        # Fallback case when psutil is not available
-        return {
-            "success": True,
-            "cpu": 0,
-            "memory": 0,
-            "disk": 0,
-            "last_update": datetime.now().isoformat(),
-            "timestamp": datetime.now().isoformat(),
-            "note": "psutil not available - showing dummy data"
-        }
-    except Exception as e:
-        logger.error(f"Erro ao obter métricas do sistema: {e}")
-        return {"success": False, "error": str(e)}
+    """API: Métricas completas do servidor host (CPU, memória, disco, uptime, rede)"""
+    import asyncio
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, get_server_metrics)
 
 @app.get("/api/background_service_status")
 async def route_background_service_status():
