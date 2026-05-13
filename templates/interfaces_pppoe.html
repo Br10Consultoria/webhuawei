@@ -25,7 +25,9 @@
     <!-- Loading descoberta -->
     <div id="discoverLoading" class="hidden text-center py-6">
         <i class="fas fa-spinner fa-spin text-blue-500 text-2xl mb-2"></i>
-        <div class="text-sm text-slate-500">Consultando roteador... pode levar alguns segundos</div>
+        <div class="text-sm font-semibold text-slate-600 mb-1">Consultando roteador...</div>
+        <div class="text-xs text-slate-400">O comando pode levar 30-60 segundos no NE8000.</div>
+        <div class="text-xs text-amber-500 mt-1"><i class="fas fa-info-circle mr-1"></i>O servidor continua respondendo normalmente durante a consulta.</div>
     </div>
 
     <!-- Tabela de interfaces descobertas -->
@@ -153,14 +155,16 @@ async function discoverInterfaces() {
     const slot = parseInt(document.getElementById('discoverSlot').value) || 0;
     const btn = document.getElementById('discoverBtn');
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Descobrindo...';
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Aguarde...';
     document.getElementById('discoverLoading').classList.remove('hidden');
     document.getElementById('discoverResult').classList.add('hidden');
     document.getElementById('discoverEmpty').classList.add('hidden');
+    const startTime = Date.now();
 
     try {
         const r = await fetch(`/api/discover_interfaces?slot=${slot}`);
         const d = await r.json();
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
         document.getElementById('discoverLoading').classList.add('hidden');
 
         if (!d.success) {
@@ -175,7 +179,8 @@ async function discoverInterfaces() {
 
         document.getElementById('discoverTotalIfaces').textContent = d.total_interfaces;
         document.getElementById('discoverTotalUsers').textContent = d.total_users;
-        document.getElementById('discoverTimestamp').textContent = 'Atualizado: ' + new Date().toLocaleTimeString('pt-BR');
+        const cacheInfo = d.from_cache === false ? ` (${elapsed}s)` : ' ✔ cache';
+        document.getElementById('discoverTimestamp').textContent = 'Atualizado: ' + new Date().toLocaleTimeString('pt-BR') + cacheInfo;
 
         const tbody = document.getElementById('discoverTableBody');
         tbody.innerHTML = d.interfaces.map(iface => {
