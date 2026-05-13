@@ -107,11 +107,39 @@ class SimpleSSHConnection:
     # Execução de comandos
     # ------------------------------------------------------------------
 
-    def execute_command(self, command: str) -> str:
-        """Executar comando no roteador (SSH ou Telnet)"""
-        if not self.connected:
+    def _is_alive(self) -> bool:
+        """Verificar se a conexão SSH/Telnet ainda está ativa"""
+        try:
+            if self.protocol == "ssh":
+                if self.shell is None:
+                    return False
+                transport = self.shell.get_transport() if hasattr(self.shell, 'get_transport') else None
+                if transport is None:
+                    # shell é um Channel do paramiko
+                    t = self.ssh_client.get_transport() if self.ssh_client else None
+                    return t is not None and t.is_active()
+                return transport.is_active()
+            elif self.protocol == "telnet":
+                if self.telnet_client is None:
+                    return False
+                # Telnet: tentar enviar NOP (sequência vazia)
+                self.telnet_client.write(b"")
+                return True
+        except Exception:
+            return False
+
+    def _ensure_connected(self) -> None:
+        """Garantir que a conexão está ativa; reconectar se necessário"""
+        if not self.connected or not self._is_alive():
+            logger.warning("🔄 Conexão perdida — reconectando automaticamente...")
+            self.disconnect()
             if not self.connect():
-                raise Exception("Falha na conexão com o roteador")
+                raise Exception("Falha ao reconectar com o roteador")
+            logger.info("✅ Reconectado com sucesso")
+
+    def execute_command(self, command: str) -> str:
+        """Executar comando no roteador (SSH ou Telnet) com reconexão automática"""
+        self._ensure_connected()
         if self.protocol == "telnet":
             return self._execute_telnet(command)
         return self._execute_ssh(command)

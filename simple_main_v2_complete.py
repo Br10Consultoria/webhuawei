@@ -303,6 +303,23 @@ async def route_background_service_status():
         logger.error(f"Erro ao verificar status do serviço: {e}")
         return {"success": False, "error": str(e)}
 
+@app.post("/api/clear_interfaces_cache")
+async def route_clear_interfaces_cache():
+    """API: Limpar cache de interfaces descobertas para forçar nova descoberta"""
+    try:
+        cache = get_cache()
+        for slot in range(10):
+            cache.remove(f"discover_interfaces_slot{slot}")
+        logger.info("Cache de interfaces limpo — próxima descoberta será em tempo real")
+        return {
+            "success": True,
+            "message": "Cache de interfaces limpo. Clique em 'Descobrir Interfaces' para atualizar.",
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Erro ao limpar cache de interfaces: {e}")
+        return {"success": False, "error": str(e)}
+
 @app.post("/api/force_cache_refresh")
 async def route_force_cache_refresh():
     """API: Forçar atualização do cache"""

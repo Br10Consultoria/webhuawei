@@ -19,7 +19,14 @@
             <button onclick="discoverInterfaces()" class="btn-primary" id="discoverBtn">
                 <i class="fas fa-radar"></i> Descobrir Interfaces
             </button>
+            <button onclick="clearInterfacesCache()" class="btn-secondary" id="clearCacheBtn" title="Limpar cache e forçar nova descoberta do roteador">
+                <i class="fas fa-sync-alt"></i> Forçar Atualização
+            </button>
         </div>
+    </div>
+    <!-- Aviso de cache -->
+    <div class="text-xs text-slate-400 mb-3">
+        <i class="fas fa-clock mr-1"></i> As interfaces são armazenadas em cache por <strong>1 hora</strong> para evitar sobrecarga no roteador. Use “Forçar Atualização” para buscar novamente.
     </div>
 
     <!-- Loading descoberta -->
@@ -150,6 +157,30 @@
 </div>
 
 <script>
+// ── Limpar cache de interfaces ────────────────────────────────────────────
+async function clearInterfacesCache() {
+    const btn = document.getElementById('clearCacheBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Limpando...';
+    try {
+        const r = await fetch('/api/clear_interfaces_cache', {method: 'POST'});
+        const d = await r.json();
+        if (d.success) {
+            showMessage('Cache limpo! Clique em "Descobrir Interfaces" para atualizar.', 'success');
+            // Limpar tabela atual
+            document.getElementById('discoverResult').classList.add('hidden');
+            document.getElementById('discoverEmpty').classList.add('hidden');
+        } else {
+            showMessage('Erro ao limpar cache: ' + d.error, 'error');
+        }
+    } catch(e) {
+        showMessage('Erro: ' + e.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-sync-alt"></i> Forçar Atualização';
+    }
+}
+
 // ── Descoberta automática ──────────────────────────────────────────────────
 async function discoverInterfaces() {
     const slot = parseInt(document.getElementById('discoverSlot').value) || 0;

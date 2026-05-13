@@ -531,9 +531,10 @@ async def pppoe_interfaces_real(slot: int = 0, interface: str = "", vlan: int = 
             logger.info(f"[thread] Executando: {cmd}")
             output = ssh_conn.execute_command(cmd)
             count = 0
-            m = _re.search(r"(\d+)\s+(?:user|record|line)", output, _re.IGNORECASE)
+            # Formato real NE8000: "Total lines: 184."
+            m = _re.search(r"Total\s+lines[:\s]+(\d+)", output, _re.IGNORECASE)
             if not m:
-                m = _re.search(r"Total\s*[:\s]+(\d+)", output, _re.IGNORECASE)
+                m = _re.search(r"(\d+)\s+(?:user|record|line)", output, _re.IGNORECASE)
             if not m:
                 m = _re.search(r"^\s*(\d+)\s*$", output.strip(), _re.MULTILINE)
             if m:
@@ -610,9 +611,9 @@ async def discover_physical_interfaces(slot: int = 0):
     Usa cache de 5 minutos para evitar re-execução frequente.
     Comando: display interface brief | include GigabitEthernet
     """
-    # Verificar cache primeiro (5 minutos = 300s)
+    # Verificar cache primeiro (1 hora = 3600s)
     cache_key = f"discover_interfaces_slot{slot}"
-    cached = get_cached_data(cache_key, 300)
+    cached = get_cached_data(cache_key, 3600)
     if cached:
         logger.info(f"discover_interfaces: retornando cache ({len(cached.get('interfaces', []))} interfaces)")
         return cached
@@ -678,9 +679,10 @@ async def discover_physical_interfaces(slot: int = 0):
                 cmd_count = f"display access-user slot {slot} | include {full_name} | exclude PPPoE | count"
                 count_output = ssh_conn.execute_command(cmd_count)
                 count = 0
-                mc = _re.search(r"(\d+)\s+(?:user|record|line)", count_output, _re.IGNORECASE)
+                # Formato real NE8000: "Total lines: 184."
+                mc = _re.search(r"Total\s+lines[:\s]+(\d+)", count_output, _re.IGNORECASE)
                 if not mc:
-                    mc = _re.search(r"Total\s*[:\s]+(\d+)", count_output, _re.IGNORECASE)
+                    mc = _re.search(r"(\d+)\s+(?:user|record|line)", count_output, _re.IGNORECASE)
                 if not mc:
                     mc = _re.search(r"^\s*(\d+)\s*$", count_output.strip(), _re.MULTILINE)
                 if mc:
