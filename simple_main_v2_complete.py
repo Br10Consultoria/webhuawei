@@ -24,6 +24,10 @@ from modules.api_routes import (
     get_ip_pool_usage
 )
 from modules.server_metrics import get_server_metrics
+from modules.interfaces_store import (
+    load_interfaces, add_interface, remove_interface,
+    add_vlans, remove_vlan
+)
 
 # Importar módulos híbridos (novos)
 try:
@@ -201,6 +205,62 @@ async def route_pppoe_users_by_interface(slot: int = 0, interface: str = ""):
 async def route_ip_pool_usage():
     """API: Uso de pools de IP (display ip-pool pool-usage)"""
     return await get_ip_pool_usage()
+
+# ============================================================================
+# ROTAS API — Gerenciamento de Interfaces (persistência no servidor)
+# ============================================================================
+@app.get("/api/interfaces")
+async def route_get_interfaces(request: Request):
+    """Lista todas as interfaces cadastradas."""
+    if not request.session.get("logged_in"):
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"error": "Não autenticado"}, status_code=401)
+    return {"success": True, "interfaces": load_interfaces()}
+
+@app.post("/api/interfaces")
+async def route_add_interface(request: Request):
+    """Adiciona uma interface física."""
+    if not request.session.get("logged_in"):
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"error": "Não autenticado"}, status_code=401)
+    body = await request.json()
+    name = body.get("name", "").strip()
+    slot = int(body.get("slot", 0))
+    desc = body.get("desc", "").strip()
+    if not name:
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"success": False, "message": "Nome da interface obrigatório."}, status_code=400)
+    return add_interface(name=name, slot=slot, desc=desc)
+
+@app.delete("/api/interfaces/{iface_name:path}")
+async def route_remove_interface(iface_name: str, request: Request):
+    """Remove uma interface física."""
+    if not request.session.get("logged_in"):
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"error": "Não autenticado"}, status_code=401)
+    return remove_interface(name=iface_name)
+
+@app.post("/api/interfaces/{iface_name:path}/vlans")
+async def route_add_vlans(iface_name: str, request: Request):
+    """Adiciona múltiplas VLANs a uma interface."""
+    if not request.session.get("logged_in"):
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"error": "Não autenticado"}, status_code=401)
+    body = await request.json()
+    vlan_ids = body.get("vlan_ids", [])
+    desc = body.get("desc", "").strip()
+    if not vlan_ids:
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"success": False, "message": "Lista de VLANs obrigatória."}, status_code=400)
+    return add_vlans(iface_name=iface_name, vlan_ids=vlan_ids, desc=desc)
+
+@app.delete("/api/interfaces/{iface_name:path}/vlans/{vlan_id}")
+async def route_remove_vlan(iface_name: str, vlan_id: int, request: Request):
+    """Remove uma VLAN de uma interface."""
+    if not request.session.get("logged_in"):
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"error": "Não autenticado"}, status_code=401)
+    return remove_vlan(iface_name=iface_name, vlan_id=vlan_id)
 
 # ============================================================================
 # ROTAS API (JSON) - SISTEMA HÍBRIDOO

@@ -2,641 +2,396 @@
 {% block title %}Interfaces PPPoE — NE8000 Manager{% endblock %}
 {% block page_title %}Interfaces PPPoE — Monitoramento por Interface Física{% endblock %}
 {% block content %}
+<div class="space-y-6">
 
-<!-- =====================================================================
-     SEÇÃO 1 — INTERFACES CADASTRADAS
-     ===================================================================== -->
-<div class="card p-5 mb-5">
-    <div class="flex items-center justify-between mb-4">
-        <div>
-            <h3 class="section-title">Interfaces Cadastradas</h3>
-            <p class="text-xs text-slate-400 mt-0.5">Adicione as interfaces físicas do NE8000. Para cada interface você pode adicionar VLANs e fazer o scan individualmente.</p>
-        </div>
-        <button onclick="openAddInterface()" class="btn-primary">
-            <i class="fas fa-plus"></i> Adicionar Interface
-        </button>
+  <!-- Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div>
+      <h2 class="text-lg font-bold text-slate-800">Interfaces Cadastradas</h2>
+      <p class="text-sm text-slate-500 mt-0.5">Adicione as interfaces fisicas do NE8000. Para cada interface voce pode adicionar VLANs e fazer o scan individualmente.</p>
     </div>
+    <button onclick="openAddInterface()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-colors flex items-center gap-2 whitespace-nowrap">
+      <i class="fas fa-plus"></i> Adicionar Interface
+    </button>
+  </div>
 
-    <!-- Lista de interfaces cadastradas -->
-    <div id="ifaceList">
-        <div id="ifaceEmpty" class="text-center py-10 text-slate-400">
-            <i class="fas fa-ethernet text-4xl mb-3 block opacity-40"></i>
-            <div class="font-medium">Nenhuma interface cadastrada</div>
-            <div class="text-xs mt-1">Clique em "Adicionar Interface" para começar</div>
-        </div>
-        <div id="ifaceCards" class="space-y-4"></div>
+  <!-- Lista de interfaces -->
+  <div id="ifaceList">
+    <div class="text-center py-16 text-slate-400">
+      <i class="fas fa-network-wired text-5xl mb-4 block opacity-30"></i>
+      <p class="font-semibold text-slate-500">Carregando interfaces...</p>
     </div>
+  </div>
+
 </div>
 
-<!-- =====================================================================
-     SEÇÃO 2 — RESULTADO DO SCAN
-     ===================================================================== -->
-<div id="scanResultSection" class="hidden card mb-5">
-    <div class="p-4 border-b border-slate-100 flex items-center justify-between">
-        <div>
-            <span class="section-title" id="scanResultTitle">Resultado do Scan</span>
-            <span class="text-xs text-slate-400 ml-2 font-mono" id="scanResultCmd"></span>
-        </div>
-        <button onclick="closeScanResult()" class="text-slate-400 hover:text-slate-600 transition">
-            <i class="fas fa-times"></i>
-        </button>
-    </div>
-
-    <!-- Contagem -->
-    <div id="scanCountBlock" class="hidden p-5">
-        <div class="flex items-center gap-4">
-            <div class="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center flex-shrink-0">
-                <i class="fas fa-users text-blue-600 text-2xl"></i>
-            </div>
-            <div>
-                <div class="text-4xl font-extrabold text-slate-800" id="scanCountNumber">—</div>
-                <div class="text-sm text-slate-500 mt-0.5" id="scanCountLabel">usuários PPPoE</div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Tabela de usuários -->
-    <div id="scanUsersBlock" class="hidden">
-        <div class="px-4 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Usuários encontrados</span>
-            <span class="text-xs text-slate-400" id="scanUsersCount"></span>
-        </div>
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-                <thead class="bg-slate-50 border-b border-slate-100">
-                    <tr>
-                        <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide w-10">#</th>
-                        <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Dados do Usuário</th>
-                    </tr>
-                </thead>
-                <tbody id="scanUsersBody" class="divide-y divide-slate-50"></tbody>
-            </table>
-        </div>
-    </div>
-
-    <!-- Raw output -->
-    <div class="border-t border-slate-100">
-        <button onclick="toggleScanRaw()" class="w-full flex items-center justify-between p-4 text-sm font-semibold text-slate-600 hover:text-slate-800 transition">
-            <span><i class="fas fa-terminal mr-2 text-slate-400"></i>Output Raw do Roteador</span>
-            <i class="fas fa-chevron-down text-slate-400" id="scanRawChevron"></i>
-        </button>
-        <div id="scanRawBlock" class="hidden border-t border-slate-100">
-            <pre class="bg-slate-900 text-green-400 p-4 text-xs overflow-x-auto font-mono leading-relaxed rounded-b-xl" id="scanRawPre"></pre>
-        </div>
-    </div>
-</div>
-
-<!-- Loading global -->
-<div id="globalLoading" class="hidden card p-8 text-center mb-5">
-    <i class="fas fa-spinner fa-spin text-blue-500 text-2xl mb-3"></i>
-    <div class="text-slate-600 font-medium" id="globalLoadingMsg">Consultando roteador...</div>
-    <div class="text-xs text-slate-400 mt-1">Aguarde — o NE8000 pode levar alguns segundos para responder.</div>
-</div>
-
-<!-- =====================================================================
-     MODAL — Adicionar Interface
-     ===================================================================== -->
+<!-- Modal: Adicionar Interface -->
 <div id="modalAddInterface" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
-        <div class="flex items-center justify-between mb-5">
-            <h3 class="text-base font-bold text-slate-800"><i class="fas fa-ethernet mr-2 text-blue-500"></i>Adicionar Interface Física</h3>
-            <button onclick="closeAddInterface()" class="text-slate-400 hover:text-slate-600 transition"><i class="fas fa-times"></i></button>
-        </div>
-        <div class="space-y-4">
-            <div>
-                <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Nome da Interface</label>
-                <input type="text" id="newIfaceName" placeholder="ex: GE0/1/5 ou GigabitEthernet0/1/5"
-                       class="input-field" oninput="updateIfacePreview()">
-                <p class="text-xs text-slate-400 mt-1">Aceita formato abreviado <span class="font-mono">GE0/1/X</span> ou completo <span class="font-mono">GigabitEthernet0/1/X</span> — o sistema converte automaticamente.</p>
-            </div>
-            <div>
-                <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Slot</label>
-                <input type="number" id="newIfaceSlot" value="0" min="0" max="9" class="input-field w-24">
-            </div>
-            <div>
-                <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Descrição (opcional)</label>
-                <input type="text" id="newIfaceDesc" placeholder="ex: Uplink OLT 1"
-                       class="input-field">
-            </div>
-            <div class="bg-slate-50 rounded-lg p-3 font-mono text-xs text-slate-500">
-                <i class="fas fa-terminal mr-1"></i>
-                <span id="ifacePreviewCmd">display access-user slot 0 | include GigabitEthernet0/1/X | exclude PPPoE | count</span>
-            </div>
-        </div>
-        <div class="flex gap-3 mt-6">
-            <button onclick="addInterface()" class="btn-primary flex-1">
-                <i class="fas fa-plus"></i> Adicionar
-            </button>
-            <button onclick="closeAddInterface()" class="btn-secondary flex-1">Cancelar</button>
-        </div>
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+    <div class="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between">
+      <h3 class="text-white font-bold text-base"><i class="fas fa-plus-circle mr-2"></i>Adicionar Interface Fisica</h3>
+      <button onclick="closeAddInterface()" class="text-white/70 hover:text-white text-xl leading-none">&times;</button>
     </div>
+    <div class="p-6 space-y-4">
+      <div>
+        <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">Nome da Interface</label>
+        <input id="newIfaceName" type="text" placeholder="Ex: GE0/1/5 ou GigabitEthernet0/1/5"
+               oninput="updateIfacePreview()"
+               class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono">
+        <p class="text-xs text-slate-400 mt-1">GigabitEthernet e convertido automaticamente para GE</p>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">Slot</label>
+          <input id="newIfaceSlot" type="number" value="0" min="0" max="9"
+                 oninput="updateIfacePreview()"
+                 class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">Descricao (opcional)</label>
+          <input id="newIfaceDesc" type="text" placeholder="Ex: Uplink OLT 1"
+                 class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+      </div>
+      <div class="bg-slate-50 rounded-lg p-3 border border-slate-200">
+        <p class="text-xs text-slate-500 mb-1 font-medium">Preview do comando:</p>
+        <code id="ifacePreviewCmd" class="text-xs text-blue-700 font-mono break-all">display access-user slot 0 | include GE0/1/X | exclude PPPoE | count</code>
+      </div>
+      <div class="flex gap-3 pt-2">
+        <button onclick="closeAddInterface()" class="flex-1 px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50 transition-colors">Cancelar</button>
+        <button onclick="confirmAddInterface()" class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-colors">
+          <i class="fas fa-plus mr-1"></i> Adicionar
+        </button>
+      </div>
+    </div>
+  </div>
 </div>
 
-<!-- =====================================================================
-     MODAL — Adicionar VLAN (suporta múltiplas VLANs e intervalos)
-     ===================================================================== -->
+<!-- Modal: Adicionar VLANs -->
 <div id="modalAddVlan" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-6">
-        <div class="flex items-center justify-between mb-5">
-            <div>
-                <h3 class="text-base font-bold text-slate-800"><i class="fas fa-tags mr-2 text-indigo-500"></i>Adicionar VLANs</h3>
-                <p class="text-xs text-slate-400 mt-0.5" id="vlanModalSubtitle">Interface: —</p>
-            </div>
-            <button onclick="closeAddVlan()" class="text-slate-400 hover:text-slate-600 transition"><i class="fas fa-times"></i></button>
-        </div>
-        <input type="hidden" id="vlanTargetIface">
-        <div class="space-y-4">
-            <!-- Campo de entrada de VLANs -->
-            <div>
-                <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">VLANs</label>
-                <input type="text" id="newVlanId"
-                       placeholder="ex: 1201, 1202, 1203 ou 1200-1210"
-                       class="input-field font-mono"
-                       oninput="updateVlanPreview()">
-                <div class="flex flex-wrap gap-2 mt-2 text-xs text-slate-400">
-                    <span class="bg-slate-100 rounded px-2 py-0.5 font-mono">1201</span>
-                    <span class="text-slate-300">— uma VLAN</span>
-                    <span class="bg-slate-100 rounded px-2 py-0.5 font-mono ml-2">1201, 1202, 1205</span>
-                    <span class="text-slate-300">— lista</span>
-                    <span class="bg-slate-100 rounded px-2 py-0.5 font-mono ml-2">1200-1210</span>
-                    <span class="text-slate-300">— intervalo</span>
-                </div>
-            </div>
-
-            <!-- Preview das VLANs a serem adicionadas -->
-            <div id="vlanPreviewBlock" class="hidden">
-                <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">VLANs a adicionar</label>
-                <div id="vlanPreviewTags" class="flex flex-wrap gap-1.5 p-3 bg-indigo-50 border border-indigo-100 rounded-lg min-h-[40px]"></div>
-                <div class="text-xs text-slate-400 mt-1.5" id="vlanPreviewCount"></div>
-            </div>
-
-            <!-- Aviso de VLANs já existentes -->
-            <div id="vlanDuplicateWarn" class="hidden bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-700">
-                <i class="fas fa-exclamation-triangle mr-1"></i>
-                <span id="vlanDuplicateMsg"></span>
-            </div>
-        </div>
-        <div class="flex gap-3 mt-6">
-            <button onclick="addVlan()" id="btnAddVlan" class="btn-primary flex-1" disabled>
-                <i class="fas fa-plus"></i> <span id="btnAddVlanLabel">Adicionar</span>
-            </button>
-            <button onclick="closeAddVlan()" class="btn-secondary flex-1">Cancelar</button>
-        </div>
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+    <div class="bg-gradient-to-r from-indigo-600 to-indigo-700 px-6 py-4 flex items-center justify-between">
+      <h3 class="text-white font-bold text-base"><i class="fas fa-layer-group mr-2"></i>Adicionar VLANs &mdash; <span id="vlanModalIfaceName" class="font-mono text-sm"></span></h3>
+      <button onclick="closeAddVlan()" class="text-white/70 hover:text-white text-xl leading-none">&times;</button>
     </div>
+    <div class="p-6 space-y-4">
+      <div>
+        <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">VLANs</label>
+        <input id="newVlanIds" type="text" placeholder="Ex: 1201, 1202-1210, 1300"
+               oninput="updateVlanPreview()"
+               class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
+        <p class="text-xs text-slate-400 mt-1">Virgulas para multiplas VLANs, hifen para intervalos (ex: 1200-1210)</p>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">Descricao (opcional)</label>
+        <input id="newVlanDesc" type="text" placeholder="Ex: Clientes residenciais"
+               class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </div>
+      <div id="vlanPreview" class="hidden bg-slate-50 rounded-lg p-3 border border-slate-200">
+        <p class="text-xs text-slate-500 mb-2 font-medium">VLANs a adicionar:</p>
+        <div id="vlanPreviewTags" class="flex flex-wrap gap-1.5 mb-2"></div>
+        <p id="vlanPreviewSummary" class="text-xs text-slate-600"></p>
+      </div>
+      <div class="flex gap-3 pt-2">
+        <button onclick="closeAddVlan()" class="flex-1 px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50 transition-colors">Cancelar</button>
+        <button id="btnAddVlan" onclick="confirmAddVlans()" disabled
+                class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-sm font-semibold transition-colors">
+          <i class="fas fa-plus mr-1"></i> <span id="btnAddVlanLabel">Adicionar</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Resultado do Scan -->
+<div id="modalScan" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden">
+    <div class="bg-gradient-to-r from-emerald-600 to-teal-700 px-6 py-4 flex items-center justify-between">
+      <h3 class="text-white font-bold text-base" id="scanModalTitle"><i class="fas fa-search mr-2"></i>Resultado do Scan</h3>
+      <button onclick="closeScan()" class="text-white/70 hover:text-white text-xl leading-none">&times;</button>
+    </div>
+    <div class="p-6" id="scanModalBody">
+      <div class="text-center py-8">
+        <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-600 mx-auto mb-3"></div>
+        <p class="text-slate-500 text-sm">Executando comando no roteador...</p>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
-// ── Storage ────────────────────────────────────────────────────────────────
-const STORAGE_KEY = 'ne8000_interfaces_v2';
+let interfaces = [];
+let currentVlanIface = null;
 
-function loadInterfaces() {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
-    catch { return []; }
+function normalizeIfaceName(name) {
+    return name.replace(/GigabitEthernet/gi, 'GE').replace(/^Ethernet/i, 'Eth').trim();
 }
 
-function saveInterfaces(list) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+async function apiGet(url) {
+    const r = await fetch(url, {credentials: 'same-origin'});
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+}
+async function apiPost(url, body) {
+    const r = await fetch(url, {
+        method: 'POST', credentials: 'same-origin',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body)
+    });
+    return r.json();
+}
+async function apiDelete(url) {
+    const r = await fetch(url, {method: 'DELETE', credentials: 'same-origin'});
+    return r.json();
 }
 
-// ── Renderização ───────────────────────────────────────────────────────────
+async function loadInterfaces() {
+    try {
+        const data = await apiGet('/api/interfaces');
+        if (data.success) {
+            interfaces = data.interfaces || [];
+            renderAll();
+        } else {
+            showError('Erro ao carregar interfaces: ' + (data.message || 'desconhecido'));
+        }
+    } catch(e) {
+        showError('Erro de conexao ao carregar interfaces: ' + e.message);
+    }
+}
+
 function renderAll() {
-    const list = loadInterfaces();
-    const empty = document.getElementById('ifaceEmpty');
-    const cards = document.getElementById('ifaceCards');
-
-    if (list.length === 0) {
-        empty.classList.remove('hidden');
-        cards.innerHTML = '';
+    const container = document.getElementById('ifaceList');
+    if (!interfaces.length) {
+        container.innerHTML = '<div class="text-center py-16 text-slate-400"><i class="fas fa-network-wired text-5xl mb-4 block opacity-30"></i><p class="font-semibold text-slate-500">Nenhuma interface cadastrada</p><p class="text-sm mt-1">Clique em "Adicionar Interface" para comecar</p></div>';
         return;
     }
-    empty.classList.add('hidden');
-
-    cards.innerHTML = list.map((iface, idx) => `
-        <div class="border border-slate-200 rounded-xl overflow-hidden">
-            <!-- Cabeçalho da interface -->
-            <div class="bg-slate-50 px-4 py-3 flex items-center justify-between border-b border-slate-200">
-                <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <i class="fas fa-ethernet text-blue-600 text-sm"></i>
-                    </div>
-                    <div>
-                        <div class="font-mono font-bold text-slate-800 text-sm">${iface.name}</div>
-                        ${iface.desc ? `<div class="text-xs text-slate-400">${iface.desc}</div>` : ''}
-                    </div>
-                    <span class="text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-mono">slot ${iface.slot}</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button onclick="scanInterface(${idx})" class="btn-primary text-xs py-1.5 px-3" title="Scan total da interface (sem VLAN)">
-                        <i class="fas fa-search"></i> Scan Total
-                    </button>
-                    <button onclick="listUsersInterface(${idx})" class="btn-secondary text-xs py-1.5 px-3" title="Listar usuários da interface">
-                        <i class="fas fa-list"></i> Listar
-                    </button>
-                    <button onclick="openAddVlan(${idx})" class="text-xs border border-indigo-200 text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg font-semibold transition" title="Adicionar VLAN">
-                        <i class="fas fa-tag"></i> + VLAN
-                    </button>
-                    <button onclick="removeInterface(${idx})" class="text-xs text-red-400 hover:text-red-600 hover:bg-red-50 px-2 py-1.5 rounded-lg transition" title="Remover interface">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            </div>
-
-            <!-- VLANs da interface -->
-            <div class="p-3">
-                ${iface.vlans && iface.vlans.length > 0 ? `
-                <div class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 px-1">VLANs</div>
-                <div class="flex flex-wrap gap-2">
-                    ${iface.vlans.map((vlan, vidx) => `
-                        <div class="flex items-center gap-1 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-1.5">
-                            <span class="font-mono font-bold text-indigo-700 text-sm">.${vlan.id}</span>
-                            ${vlan.desc ? `<span class="text-xs text-indigo-400 ml-1">${vlan.desc}</span>` : ''}
-                            <div class="flex items-center gap-1 ml-2">
-                                <button onclick="scanVlan(${idx}, ${vidx})" class="text-xs text-indigo-600 hover:text-indigo-800 font-semibold transition" title="Contar usuários nesta VLAN">
-                                    <i class="fas fa-calculator"></i>
-                                </button>
-                                <button onclick="listUsersVlan(${idx}, ${vidx})" class="text-xs text-slate-500 hover:text-slate-700 font-semibold transition ml-1" title="Listar usuários desta VLAN">
-                                    <i class="fas fa-list"></i>
-                                </button>
-                                <button onclick="removeVlan(${idx}, ${vidx})" class="text-xs text-red-400 hover:text-red-600 transition ml-1" title="Remover VLAN">
-                                    <i class="fas fa-times"></i>
-                                </button>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-                ` : `
-                <div class="text-xs text-slate-400 text-center py-3">
-                    <i class="fas fa-tag mr-1 opacity-40"></i>Nenhuma VLAN cadastrada — clique em <strong>+ VLAN</strong> para adicionar
-                </div>
-                `}
-            </div>
-        </div>
-    `).join('');
+    container.innerHTML = '<div class="space-y-4">' + interfaces.map(renderIface).join('') + '</div>';
 }
 
-// ── Modal: Adicionar Interface ─────────────────────────────────────────────
+function renderIface(iface) {
+    const vlansHtml = (iface.vlans || []).map(v =>
+        '<div class="flex items-center justify-between px-3 py-2 bg-slate-50 rounded-lg border border-slate-200 text-sm">' +
+        '<div class="flex items-center gap-2 flex-wrap">' +
+        '<span class="inline-flex items-center px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 font-mono text-xs font-bold">VLAN ' + v.id + '</span>' +
+        (v.desc ? '<span class="text-slate-500 text-xs">' + escHtml(v.desc) + '</span>' : '') +
+        '<code class="text-slate-400 text-xs hidden sm:inline">' + escHtml(iface.name) + '.' + v.id + '</code>' +
+        '</div>' +
+        '<div class="flex items-center gap-1">' +
+        '<button onclick="scanVlan('' + escHtml(iface.name) + '',' + v.id + ',' + iface.slot + ')" title="Contar usuarios" class="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"><i class="fas fa-calculator text-xs"></i></button>' +
+        '<button onclick="listVlan('' + escHtml(iface.name) + '',' + v.id + ',' + iface.slot + ')" title="Listar usuarios" class="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><i class="fas fa-list text-xs"></i></button>' +
+        '<button onclick="removeVlan('' + escHtml(iface.name) + '',' + v.id + ')" title="Remover VLAN" class="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"><i class="fas fa-times text-xs"></i></button>' +
+        '</div></div>'
+    ).join('');
+
+    return '<div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">' +
+        '<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-5 py-4 border-b border-slate-100">' +
+        '<div class="flex items-center gap-3">' +
+        '<div class="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0"><i class="fas fa-ethernet text-blue-600"></i></div>' +
+        '<div><p class="font-bold text-slate-800 font-mono text-sm">' + escHtml(iface.name) + '</p>' +
+        '<p class="text-xs text-slate-400">Slot ' + iface.slot + (iface.desc ? ' &mdash; ' + escHtml(iface.desc) : '') + ' &middot; ' + (iface.vlans||[]).length + ' VLAN(s)</p></div>' +
+        '</div>' +
+        '<div class="flex items-center gap-2 flex-wrap">' +
+        '<button onclick="scanIface('' + escHtml(iface.name) + '',' + iface.slot + ')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-1"><i class="fas fa-calculator"></i> Scan Total</button>' +
+        '<button onclick="listIface('' + escHtml(iface.name) + '',' + iface.slot + ')" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-1"><i class="fas fa-list"></i> Listar</button>' +
+        '<button onclick="openAddVlan('' + escHtml(iface.name) + '')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-1"><i class="fas fa-layer-group"></i> + VLAN</button>' +
+        '<button onclick="removeIface('' + escHtml(iface.name) + '')" class="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Remover interface"><i class="fas fa-trash text-xs"></i></button>' +
+        '</div></div>' +
+        ((iface.vlans||[]).length
+            ? '<div class="px-5 py-3"><p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">VLANs</p><div class="space-y-1.5">' + vlansHtml + '</div></div>'
+            : '<div class="px-5 py-3 text-xs text-slate-400 italic">Nenhuma VLAN cadastrada. Clique em "+ VLAN" para adicionar.</div>') +
+        '</div>';
+}
+
 function openAddInterface() {
     document.getElementById('newIfaceName').value = '';
     document.getElementById('newIfaceSlot').value = '0';
     document.getElementById('newIfaceDesc').value = '';
     updateIfacePreview();
     document.getElementById('modalAddInterface').classList.remove('hidden');
-    document.getElementById('newIfaceName').focus();
+    setTimeout(() => document.getElementById('newIfaceName').focus(), 100);
 }
-
-function closeAddInterface() {
-    document.getElementById('modalAddInterface').classList.add('hidden');
-}
-
-function normalizeIfaceName(name) {
-    // Converte GigabitEthernet -> GE (igual ao backend)
-    return name.replace(/GigabitEthernet/gi, 'GE').replace(/^Ethernet/i, 'Eth');
-}
-
+function closeAddInterface() { document.getElementById('modalAddInterface').classList.add('hidden'); }
 function updateIfacePreview() {
     const raw = document.getElementById('newIfaceName').value.trim() || 'GE0/1/X';
     const name = normalizeIfaceName(raw);
     const slot = document.getElementById('newIfaceSlot').value || '0';
-    document.getElementById('ifacePreviewCmd').textContent =
-        `display access-user slot ${slot} | include ${name} | exclude PPPoE | count`;
+    document.getElementById('ifacePreviewCmd').textContent = 'display access-user slot ' + slot + ' | include ' + name + ' | exclude PPPoE | count';
 }
-
-function addInterface() {
-    const rawName = document.getElementById('newIfaceName').value.trim();
-    const name = normalizeIfaceName(rawName);  // sempre salva no formato abreviado
+async function confirmAddInterface() {
+    const raw = document.getElementById('newIfaceName').value.trim();
+    if (!raw) { alert('Informe o nome da interface.'); return; }
+    const name = normalizeIfaceName(raw);
     const slot = parseInt(document.getElementById('newIfaceSlot').value) || 0;
     const desc = document.getElementById('newIfaceDesc').value.trim();
-    if (!name) { showMessage('Informe o nome da interface.', 'error'); return; }
-    const list = loadInterfaces();
-    if (list.find(i => i.name === name)) { showMessage('Interface já cadastrada.', 'error'); return; }
-    list.push({ name, slot, desc, vlans: [] });
-    saveInterfaces(list);
-    closeAddInterface();
-    renderAll();
-    showMessage(`Interface ${name} adicionada com sucesso.`, 'success');
+    try {
+        const data = await apiPost('/api/interfaces', {name, slot, desc});
+        if (data.success) { interfaces = data.interfaces; renderAll(); closeAddInterface(); showToast('Interface ' + name + ' adicionada!', 'success'); }
+        else showToast(data.message || 'Erro ao adicionar interface.', 'error');
+    } catch(e) { showToast('Erro de conexao: ' + e.message, 'error'); }
 }
 
-function removeInterface(idx) {
-    const list = loadInterfaces();
-    const name = list[idx].name;
-    if (!confirm(`Remover a interface ${name} e todas as suas VLANs?`)) return;
-    list.splice(idx, 1);
-    saveInterfaces(list);
-    renderAll();
-    showMessage(`Interface ${name} removida.`, 'success');
+async function removeIface(name) {
+    if (!confirm('Remover a interface ' + name + ' e todas as suas VLANs?')) return;
+    try {
+        const data = await apiDelete('/api/interfaces/' + encodeURIComponent(name));
+        if (data.success) { interfaces = data.interfaces; renderAll(); showToast('Interface ' + name + ' removida.', 'success'); }
+        else showToast(data.message || 'Erro ao remover.', 'error');
+    } catch(e) { showToast('Erro de conexao.', 'error'); }
 }
 
-// ── Modal: Adicionar VLAN (múltiplas / intervalos) ────────────────────────
-let _vlanTargetIdx = null;
-
-function parseVlanInput(raw) {
-    /**
-     * Converte a entrada do usuário em um array de IDs de VLAN únicos e ordenados.
-     * Suporta:
-     *   - Número único:  "1201"
-     *   - Lista:          "1201, 1202, 1205"
-     *   - Intervalo:      "1200-1210"
-     *   - Misto:          "1100, 1200-1205, 1300"
-     */
-    const ids = new Set();
-    const parts = raw.split(',').map(s => s.trim()).filter(Boolean);
-    for (const part of parts) {
-        if (part.includes('-')) {
-            const [a, b] = part.split('-').map(s => parseInt(s.trim()));
-            if (!isNaN(a) && !isNaN(b) && a <= b && a >= 1 && b <= 4094) {
-                for (let i = a; i <= b; i++) ids.add(i);
-            }
-        } else {
-            const n = parseInt(part);
-            if (!isNaN(n) && n >= 1 && n <= 4094) ids.add(n);
-        }
-    }
-    return [...ids].sort((a, b) => a - b);
-}
-
-function openAddVlan(ifaceIdx) {
-    _vlanTargetIdx = ifaceIdx;
-    document.getElementById('newVlanId').value = '';
-    document.getElementById('vlanPreviewBlock').classList.add('hidden');
-    document.getElementById('vlanPreviewTags').innerHTML = '';
-    document.getElementById('vlanPreviewCount').textContent = '';
-    document.getElementById('vlanDuplicateWarn').classList.add('hidden');
+function openAddVlan(ifaceName) {
+    currentVlanIface = ifaceName;
+    document.getElementById('vlanModalIfaceName').textContent = ifaceName;
+    document.getElementById('newVlanIds').value = '';
+    document.getElementById('newVlanDesc').value = '';
+    document.getElementById('vlanPreview').classList.add('hidden');
     document.getElementById('btnAddVlan').disabled = true;
     document.getElementById('btnAddVlanLabel').textContent = 'Adicionar';
-    const list = loadInterfaces();
-    const iface = list[ifaceIdx];
-    document.getElementById('vlanModalSubtitle').textContent = `Interface: ${iface.name} (slot ${iface.slot})`;
     document.getElementById('modalAddVlan').classList.remove('hidden');
-    document.getElementById('newVlanId').focus();
+    setTimeout(() => document.getElementById('newVlanIds').focus(), 100);
 }
+function closeAddVlan() { document.getElementById('modalAddVlan').classList.add('hidden'); currentVlanIface = null; }
 
-function closeAddVlan() {
-    document.getElementById('modalAddVlan').classList.add('hidden');
-    _vlanTargetIdx = null;
+function parseVlanInput(input) {
+    const ids = new Set();
+    for (const part of input.split(',')) {
+        const t = part.trim();
+        if (!t) continue;
+        const range = t.match(/^(\d+)\s*-\s*(\d+)$/);
+        if (range) {
+            const s = parseInt(range[1]), e = parseInt(range[2]);
+            if (s <= e && e - s <= 4094) for (let i = s; i <= e; i++) ids.add(i);
+        } else if (/^\d+$/.test(t)) {
+            const v = parseInt(t);
+            if (v >= 1 && v <= 4094) ids.add(v);
+        }
+    }
+    return Array.from(ids).sort((a,b) => a-b);
 }
-
 function updateVlanPreview() {
-    if (_vlanTargetIdx === null) return;
-    const raw = document.getElementById('newVlanId').value.trim();
-    const ids = parseVlanInput(raw);
-    const previewBlock = document.getElementById('vlanPreviewBlock');
-    const tagsEl = document.getElementById('vlanPreviewTags');
-    const countEl = document.getElementById('vlanPreviewCount');
-    const warnEl = document.getElementById('vlanDuplicateWarn');
-    const btn = document.getElementById('btnAddVlan');
-    const btnLabel = document.getElementById('btnAddVlanLabel');
-
-    if (ids.length === 0) {
-        previewBlock.classList.add('hidden');
-        warnEl.classList.add('hidden');
-        btn.disabled = true;
-        btnLabel.textContent = 'Adicionar';
-        return;
-    }
-
-    const list = loadInterfaces();
-    const iface = list[_vlanTargetIdx];
-    const existing = new Set(iface.vlans.map(v => v.id));
-    const novas = ids.filter(id => !existing.has(id));
-    const duplicadas = ids.filter(id => existing.has(id));
-
-    // Renderizar tags
-    previewBlock.classList.remove('hidden');
-    tagsEl.innerHTML = ids.map(id => {
-        const isDup = existing.has(id);
-        return `<span class="text-xs font-mono px-2 py-0.5 rounded-full border ${
-            isDup
-            ? 'bg-amber-100 border-amber-300 text-amber-700 line-through'
-            : 'bg-indigo-100 border-indigo-200 text-indigo-700'
-        }">${id}</span>`;
-    }).join('');
-
-    countEl.textContent = novas.length > 0
-        ? `${novas.length} VLAN(s) serão adicionadas${duplicadas.length > 0 ? ` (${duplicadas.length} já existem e serão ignoradas)` : ''}`
-        : '';
-
-    // Aviso de duplicatas
-    if (duplicadas.length > 0 && novas.length === 0) {
-        warnEl.classList.remove('hidden');
-        document.getElementById('vlanDuplicateMsg').textContent =
-            `Todas as VLANs informadas já estão cadastradas nesta interface.`;
-        btn.disabled = true;
-        btnLabel.textContent = 'Adicionar';
-    } else if (duplicadas.length > 0) {
-        warnEl.classList.remove('hidden');
-        document.getElementById('vlanDuplicateMsg').textContent =
-            `VLANs já existentes (riscadas) serão ignoradas: ${duplicadas.join(', ')}`;
-        btn.disabled = false;
-        btnLabel.textContent = `Adicionar ${novas.length} VLAN(s)`;
-    } else {
-        warnEl.classList.add('hidden');
-        btn.disabled = false;
-        btnLabel.textContent = `Adicionar ${novas.length} VLAN(s)`;
-    }
+    const parsed = parseVlanInput(document.getElementById('newVlanIds').value);
+    const iface = interfaces.find(i => i.name === currentVlanIface);
+    const existing = new Set((iface && iface.vlans ? iface.vlans : []).map(v => v.id));
+    const novas = parsed.filter(v => !existing.has(v));
+    const skipped = parsed.filter(v => existing.has(v));
+    const preview = document.getElementById('vlanPreview');
+    if (!parsed.length) { preview.classList.add('hidden'); document.getElementById('btnAddVlan').disabled = true; document.getElementById('btnAddVlanLabel').textContent = 'Adicionar'; return; }
+    preview.classList.remove('hidden');
+    document.getElementById('vlanPreviewTags').innerHTML = [
+        ...novas.map(v => '<span class="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-xs font-mono font-bold">' + v + '</span>'),
+        ...skipped.map(v => '<span class="px-2 py-0.5 bg-amber-100 text-amber-600 rounded text-xs font-mono line-through">' + v + '</span>')
+    ].join('');
+    let msg = '';
+    if (novas.length) msg += novas.length + ' VLAN(s) serao adicionadas';
+    if (skipped.length) msg += (novas.length ? ', ' : '') + skipped.length + ' ja existem e serao ignoradas';
+    document.getElementById('vlanPreviewSummary').textContent = msg + '.';
+    document.getElementById('btnAddVlan').disabled = novas.length === 0;
+    document.getElementById('btnAddVlanLabel').textContent = novas.length ? 'Adicionar ' + novas.length + ' VLAN(s)' : 'Nenhuma nova';
 }
-
-function addVlan() {
-    if (_vlanTargetIdx === null) return;
-    const raw = document.getElementById('newVlanId').value.trim();
-    const ids = parseVlanInput(raw);
-    if (ids.length === 0) { showMessage('Informe ao menos uma VLAN válida (1-4094).', 'error'); return; }
-
-    const list = loadInterfaces();
-    const iface = list[_vlanTargetIdx];
-    const existing = new Set(iface.vlans.map(v => v.id));
-    const novas = ids.filter(id => !existing.has(id));
-
-    if (novas.length === 0) { showMessage('Todas as VLANs informadas já estão cadastradas.', 'error'); return; }
-
-    novas.forEach(id => iface.vlans.push({ id, desc: '' }));
-    iface.vlans.sort((a, b) => a.id - b.id);
-    saveInterfaces(list);
-    closeAddVlan();
-    renderAll();
-    showMessage(
-        novas.length === 1
-            ? `VLAN ${novas[0]} adicionada à interface ${iface.name}.`
-            : `${novas.length} VLANs adicionadas à interface ${iface.name}: ${novas.join(', ')}.`,
-        'success'
-    );
-});
-}
-
-function removeVlan(ifaceIdx, vlanIdx) {
-    const list = loadInterfaces();
-    const iface = list[ifaceIdx];
-    const vlan = iface.vlans[vlanIdx];
-    iface.vlans.splice(vlanIdx, 1);
-    saveInterfaces(list);
-    renderAll();
-    showMessage(`VLAN ${vlan.id} removida.`, 'success');
-}
-
-// ── Scan ───────────────────────────────────────────────────────────────────
-function showLoading(msg) {
-    document.getElementById('globalLoadingMsg').textContent = msg || 'Consultando roteador...';
-    document.getElementById('globalLoading').classList.remove('hidden');
-    document.getElementById('scanResultSection').classList.add('hidden');
-}
-
-function hideLoading() {
-    document.getElementById('globalLoading').classList.add('hidden');
-}
-
-function closeScanResult() {
-    document.getElementById('scanResultSection').classList.add('hidden');
-}
-
-function toggleScanRaw() {
-    const block = document.getElementById('scanRawBlock');
-    const chevron = document.getElementById('scanRawChevron');
-    block.classList.toggle('hidden');
-    chevron.classList.toggle('fa-chevron-down');
-    chevron.classList.toggle('fa-chevron-up');
-}
-
-async function scanInterface(idx) {
-    const list = loadInterfaces();
-    const iface = list[idx];
-    const cmd = `display access-user slot ${iface.slot} | include ${iface.name} | exclude PPPoE | count`;
-    showLoading(`Contando usuários em ${iface.name}...`);
+async function confirmAddVlans() {
+    if (!currentVlanIface) return;
+    const parsed = parseVlanInput(document.getElementById('newVlanIds').value);
+    const desc = document.getElementById('newVlanDesc').value.trim();
+    const iface = interfaces.find(i => i.name === currentVlanIface);
+    const existing = new Set((iface && iface.vlans ? iface.vlans : []).map(v => v.id));
+    const novas = parsed.filter(v => !existing.has(v));
+    if (!novas.length) return;
     try {
-        const params = new URLSearchParams({ slot: iface.slot, interface: iface.name, vlan: 0 });
-        const r = await fetch(`/api/pppoe_interfaces_real?${params}`);
-        const d = await r.json();
-        hideLoading();
-        showCountResult(iface.name, d, cmd);
-    } catch(e) {
-        hideLoading();
-        showMessage('Erro de conexão: ' + e.message, 'error');
-    }
+        const data = await apiPost('/api/interfaces/' + encodeURIComponent(currentVlanIface) + '/vlans', {vlan_ids: novas, desc});
+        if (data.success) { interfaces = data.interfaces; renderAll(); closeAddVlan(); showToast(data.message, 'success'); }
+        else showToast(data.message || 'Erro ao adicionar VLANs.', 'error');
+    } catch(e) { showToast('Erro de conexao: ' + e.message, 'error'); }
 }
 
-async function listUsersInterface(idx) {
-    const list = loadInterfaces();
-    const iface = list[idx];
-    const cmd = `display access-user slot ${iface.slot} | include ${iface.name} | exclude PPPoE`;
-    showLoading(`Listando usuários em ${iface.name}...`);
+async function removeVlan(ifaceName, vlanId) {
+    if (!confirm('Remover VLAN ' + vlanId + ' de ' + ifaceName + '?')) return;
     try {
-        const params = new URLSearchParams({ slot: iface.slot, interface: iface.name });
-        const r = await fetch(`/api/pppoe_users_by_interface?${params}`);
-        const d = await r.json();
-        hideLoading();
-        showUsersResult(iface.name, d, cmd);
-    } catch(e) {
-        hideLoading();
-        showMessage('Erro de conexão: ' + e.message, 'error');
-    }
+        const data = await apiDelete('/api/interfaces/' + encodeURIComponent(ifaceName) + '/vlans/' + vlanId);
+        if (data.success) { interfaces = data.interfaces; renderAll(); showToast('VLAN ' + vlanId + ' removida.', 'success'); }
+        else showToast(data.message || 'Erro ao remover VLAN.', 'error');
+    } catch(e) { showToast('Erro de conexao.', 'error'); }
 }
 
-async function scanVlan(ifaceIdx, vlanIdx) {
-    const list = loadInterfaces();
-    const iface = list[ifaceIdx];
-    const vlan = iface.vlans[vlanIdx];
-    const ifaceName = `${iface.name}.${vlan.id}`;
-    const cmd = `display access-user slot ${iface.slot} | include ${ifaceName} | exclude PPPoE | count`;
-    showLoading(`Contando usuários na VLAN ${vlan.id} (${iface.name})...`);
+function openScan(title) {
+    document.getElementById('scanModalTitle').innerHTML = '<i class="fas fa-search mr-2"></i>' + escHtml(title);
+    document.getElementById('scanModalBody').innerHTML = '<div class="text-center py-8"><div class="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-600 mx-auto mb-3"></div><p class="text-slate-500 text-sm">Executando comando no roteador...</p><p class="text-slate-400 text-xs mt-1">Pode levar alguns segundos</p></div>';
+    document.getElementById('modalScan').classList.remove('hidden');
+}
+function closeScan() { document.getElementById('modalScan').classList.add('hidden'); }
+
+function renderScanCount(label, count, rawOutput, cmd) {
+    document.getElementById('scanModalBody').innerHTML =
+        '<div class="flex items-center gap-4 p-4 bg-emerald-50 rounded-xl border border-emerald-200">' +
+        '<div class="w-14 h-14 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0"><i class="fas fa-users text-emerald-600 text-2xl"></i></div>' +
+        '<div><p class="text-3xl font-black text-slate-800">' + count + '</p>' +
+        '<p class="text-sm text-slate-600">usuario(s) PPPoE em <span class="font-mono font-bold">' + escHtml(label) + '</span></p>' +
+        '<code class="text-xs text-slate-400 font-mono">' + escHtml(cmd) + '</code></div></div>' +
+        (rawOutput ? '<details class="mt-3"><summary class="cursor-pointer text-xs font-semibold text-slate-500 hover:text-slate-700 flex items-center gap-1"><i class="fas fa-terminal text-slate-400"></i> Output Raw</summary><pre class="mt-2 bg-slate-900 text-green-400 rounded-lg p-4 text-xs overflow-auto max-h-48 font-mono">' + escHtml(rawOutput) + '</pre></details>' : '');
+}
+function renderScanList(label, users, rawOutput, cmd) {
+    const rows = users.length
+        ? users.map(u => '<tr class="hover:bg-slate-50"><td class="px-3 py-2 font-mono text-sm text-blue-700">' + escHtml(u) + '</td></tr>').join('')
+        : '<tr><td class="px-3 py-4 text-center text-slate-400 text-sm">Nenhum usuario encontrado</td></tr>';
+    document.getElementById('scanModalBody').innerHTML =
+        '<div class="flex items-center justify-between mb-3"><p class="text-sm font-semibold text-slate-700">' + users.length + ' usuario(s) em <span class="font-mono text-blue-700">' + escHtml(label) + '</span></p></div>' +
+        '<div class="overflow-auto max-h-64 rounded-lg border border-slate-200"><table class="w-full text-left"><tbody>' + rows + '</tbody></table></div>' +
+        (rawOutput ? '<details class="mt-3"><summary class="cursor-pointer text-xs font-semibold text-slate-500 hover:text-slate-700 flex items-center gap-1"><i class="fas fa-terminal text-slate-400"></i> Output Raw</summary><pre class="mt-2 bg-slate-900 text-green-400 rounded-lg p-4 text-xs overflow-auto max-h-48 font-mono">' + escHtml(rawOutput) + '</pre></details>' : '');
+}
+
+async function scanIface(name, slot) {
+    const cmd = 'display access-user slot ' + slot + ' | include ' + name + ' | exclude PPPoE | count';
+    openScan('Scan Total &mdash; ' + name);
     try {
-        const params = new URLSearchParams({ slot: iface.slot, interface: iface.name, vlan: vlan.id });
-        const r = await fetch(`/api/pppoe_interfaces_real?${params}`);
-        const d = await r.json();
-        hideLoading();
-        showCountResult(ifaceName, d, cmd);
-    } catch(e) {
-        hideLoading();
-        showMessage('Erro de conexão: ' + e.message, 'error');
-    }
+        const data = await apiGet('/api/pppoe_interfaces_real?slot=' + slot + '&interface=' + encodeURIComponent(name) + '&vlan=0');
+        renderScanCount(name, data.total_users != null ? data.total_users : 0, data.raw_output || '', cmd);
+    } catch(e) { document.getElementById('scanModalBody').innerHTML = '<p class="text-red-600 text-sm">Erro: ' + e.message + '</p>'; }
 }
-
-async function listUsersVlan(ifaceIdx, vlanIdx) {
-    const list = loadInterfaces();
-    const iface = list[ifaceIdx];
-    const vlan = iface.vlans[vlanIdx];
-    const ifaceName = `${iface.name}.${vlan.id}`;
-    const cmd = `display access-user slot ${iface.slot} | include ${ifaceName} | exclude PPPoE`;
-    showLoading(`Listando usuários na VLAN ${vlan.id} (${iface.name})...`);
+async function scanVlan(name, vlanId, slot) {
+    const label = name + '.' + vlanId;
+    const cmd = 'display access-user slot ' + slot + ' | include ' + label + ' | exclude PPPoE | count';
+    openScan('Scan VLAN &mdash; ' + label);
     try {
-        const params = new URLSearchParams({ slot: iface.slot, interface: ifaceName });
-        const r = await fetch(`/api/pppoe_users_by_interface?${params}`);
-        const d = await r.json();
-        hideLoading();
-        showUsersResult(ifaceName, d, cmd);
-    } catch(e) {
-        hideLoading();
-        showMessage('Erro de conexão: ' + e.message, 'error');
-    }
+        const data = await apiGet('/api/pppoe_interfaces_real?slot=' + slot + '&interface=' + encodeURIComponent(name) + '&vlan=' + vlanId);
+        renderScanCount(label, data.total_users != null ? data.total_users : 0, data.raw_output || '', cmd);
+    } catch(e) { document.getElementById('scanModalBody').innerHTML = '<p class="text-red-600 text-sm">Erro: ' + e.message + '</p>'; }
+}
+async function listIface(name, slot) {
+    const cmd = 'display access-user slot ' + slot + ' | include ' + name + ' | exclude PPPoE';
+    openScan('Usuarios &mdash; ' + name);
+    try {
+        const data = await apiGet('/api/pppoe_users_by_interface?slot=' + slot + '&interface=' + encodeURIComponent(name));
+        renderScanList(name, data.users || [], data.raw_output || '', cmd);
+    } catch(e) { document.getElementById('scanModalBody').innerHTML = '<p class="text-red-600 text-sm">Erro: ' + e.message + '</p>'; }
+}
+async function listVlan(name, vlanId, slot) {
+    const iface = name + '.' + vlanId;
+    const cmd = 'display access-user slot ' + slot + ' | include ' + iface + ' | exclude PPPoE';
+    openScan('Usuarios &mdash; ' + iface);
+    try {
+        const data = await apiGet('/api/pppoe_users_by_interface?slot=' + slot + '&interface=' + encodeURIComponent(iface));
+        renderScanList(iface, data.users || [], data.raw_output || '', cmd);
+    } catch(e) { document.getElementById('scanModalBody').innerHTML = '<p class="text-red-600 text-sm">Erro: ' + e.message + '</p>'; }
 }
 
-// ── Exibição de resultados ─────────────────────────────────────────────────
-function showCountResult(label, d, cmd) {
-    document.getElementById('scanResultTitle').textContent = `Scan — ${label}`;
-    document.getElementById('scanResultCmd').textContent = cmd;
-    document.getElementById('scanCountBlock').classList.remove('hidden');
-    document.getElementById('scanUsersBlock').classList.add('hidden');
-
-    if (d.success) {
-        document.getElementById('scanCountNumber').textContent = d.total_users ?? d.count ?? 0;
-        document.getElementById('scanCountLabel').textContent = `usuários PPPoE em ${label}`;
-    } else {
-        document.getElementById('scanCountNumber').textContent = '—';
-        document.getElementById('scanCountLabel').textContent = 'Erro: ' + (d.error || 'desconhecido');
-    }
-
-    document.getElementById('scanRawPre').textContent = d.raw_output || '(sem output)';
-    document.getElementById('scanRawBlock').classList.add('hidden');
-    document.getElementById('scanRawChevron').className = 'fas fa-chevron-down text-slate-400';
-    document.getElementById('scanResultSection').classList.remove('hidden');
-    document.getElementById('scanResultSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+function showToast(msg, type) {
+    const colors = {success:'bg-emerald-600', error:'bg-red-600', info:'bg-blue-600'};
+    const t = document.createElement('div');
+    t.className = 'fixed bottom-6 right-6 z-[999] ' + (colors[type] || colors.info) + ' text-white px-4 py-3 rounded-xl shadow-xl text-sm font-medium max-w-sm';
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3500);
+}
+function showError(msg) {
+    document.getElementById('ifaceList').innerHTML = '<div class="text-center py-12 text-red-500"><i class="fas fa-exclamation-triangle text-3xl mb-3 block"></i><p>' + escHtml(msg) + '</p></div>';
+}
+function escHtml(str) {
+    return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-function showUsersResult(label, d, cmd) {
-    document.getElementById('scanResultTitle').textContent = `Usuários — ${label}`;
-    document.getElementById('scanResultCmd').textContent = cmd;
-    document.getElementById('scanCountBlock').classList.add('hidden');
-    document.getElementById('scanUsersBlock').classList.remove('hidden');
-
-    const users = d.users || [];
-    document.getElementById('scanUsersCount').textContent = `${users.length} usuário(s)`;
-
-    if (users.length === 0) {
-        document.getElementById('scanUsersBody').innerHTML = `
-            <tr><td colspan="2" class="text-center py-8 text-slate-400">
-                <i class="fas fa-user-slash text-2xl mb-2 block opacity-40"></i>
-                Nenhum usuário encontrado
-            </td></tr>`;
-    } else {
-        document.getElementById('scanUsersBody').innerHTML = users.map((u, i) => `
-            <tr class="hover:bg-slate-50 transition-colors">
-                <td class="px-4 py-3 text-slate-400 text-xs">${i + 1}</td>
-                <td class="px-4 py-3">
-                    <div class="font-mono text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">${escapeHtml(u)}</div>
-                </td>
-            </tr>`).join('');
-    }
-
-    document.getElementById('scanRawPre').textContent = d.raw_output || '(sem output)';
-    document.getElementById('scanRawBlock').classList.add('hidden');
-    document.getElementById('scanRawChevron').className = 'fas fa-chevron-down text-slate-400';
-    document.getElementById('scanResultSection').classList.remove('hidden');
-    document.getElementById('scanResultSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-function escapeHtml(str) {
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
-}
-
-// ── Fechar modais com ESC ──────────────────────────────────────────────────
-document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') {
-        closeAddInterface();
-        closeAddVlan();
-    }
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') { closeAddInterface(); closeAddVlan(); closeScan(); }
 });
 
-// ── Init ───────────────────────────────────────────────────────────────────
-renderAll();
+loadInterfaces();
 </script>
 {% endblock %}

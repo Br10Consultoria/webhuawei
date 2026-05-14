@@ -40,6 +40,8 @@ services:
     volumes:
       # Mount logs directory (optional)
       - ./logs:/app/logs
+      # Mount data directory (interfaces/VLANs persistence)
+      - ./data:/app/data
     healthcheck:
       test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
       interval: 30s
