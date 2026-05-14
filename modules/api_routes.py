@@ -511,6 +511,21 @@ async def pppoe_by_interface():
 # NOVAS FUNÇÕES: Interfaces PPPoE reais via SSH (sem SNMP)
 # =============================================================================
 
+def _normalize_iface_name(name: str) -> str:
+    """
+    Converte nome completo de interface para o formato abreviado aceito pelo NE8000.
+    Exemplos:
+      GigabitEthernet0/1/6       -> GE0/1/6
+      GigabitEthernet0/1/6.1201  -> GE0/1/6.1201
+      Ethernet0/0/0              -> Eth0/0/0
+      GE0/1/5                    -> GE0/1/5  (já abreviado, mantém)
+    """
+    import re as _re
+    name = name.strip()
+    name = _re.sub(r'(?i)GigabitEthernet', 'GE', name)
+    name = _re.sub(r'(?i)^Ethernet', 'Eth', name)
+    return name
+
 async def pppoe_interfaces_real(slot: int = 0, interface: str = "", vlan: int = 0):
     """
     Contagem real de usuários PPPoE por interface física ou VLAN via SSH.
@@ -519,10 +534,13 @@ async def pppoe_interfaces_real(slot: int = 0, interface: str = "", vlan: int = 
     if not interface:
         return {"success": False, "error": "Parâmetro 'interface' obrigatório (ex: GE0/1/0)"}
 
+    # Converter para formato abreviado aceito pelo NE8000 (GE0/1/X)
+    iface_short = _normalize_iface_name(interface)
+
     if vlan and vlan > 0:
-        cmd = f"display access-user slot {slot} | include {interface}.{vlan} | exclude PPPoE | count"
+        cmd = f"display access-user slot {slot} | include {iface_short}.{vlan} | exclude PPPoE | count"
     else:
-        cmd = f"display access-user slot {slot} | include {interface} | exclude PPPoE | count"
+        cmd = f"display access-user slot {slot} | include {iface_short} | exclude PPPoE | count"
 
     def _run():
         import re as _re
@@ -571,7 +589,10 @@ async def pppoe_users_by_interface(slot: int = 0, interface: str = ""):
     if not interface:
         return {"success": False, "error": "Parâmetro 'interface' obrigatório (ex: GE0/1/0)"}
 
-    cmd = f"display access-user slot {slot} | include {interface} | exclude PPPoE"
+    # Converter para formato abreviado aceito pelo NE8000 (GE0/1/X)
+    iface_short = _normalize_iface_name(interface)
+
+    cmd = f"display access-user slot {slot} | include {iface_short} | exclude PPPoE"
 
     def _run():
         import re as _re
