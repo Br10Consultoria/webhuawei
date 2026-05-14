@@ -20,7 +20,7 @@ from modules import audit_log as _audit_log
 from modules.api_routes import (
     get_online_total, pppoe_query, pppoe_disconnect,
     get_connection_status, reconnect, bandwidth_data, pppoe_history, pppoe_by_interface,
-    pppoe_interfaces_real, pppoe_users_by_interface, discover_physical_interfaces,
+    pppoe_interfaces_real, pppoe_users_by_interface,
     get_ip_pool_usage
 )
 from modules.server_metrics import get_server_metrics
@@ -197,11 +197,6 @@ async def route_pppoe_users_by_interface(slot: int = 0, interface: str = ""):
     from modules.api_routes import pppoe_users_by_interface
     return await pppoe_users_by_interface(slot=slot, interface=interface)
 
-@app.get("/api/discover_interfaces")
-async def route_discover_interfaces(slot: int = 0):
-    """API: Descoberta automatica de interfaces fisicas GE com contagem PPPoE"""
-    return await discover_physical_interfaces(slot=slot)
-
 @app.get("/api/ip_pool_usage")
 async def route_ip_pool_usage():
     """API: Uso de pools de IP (display ip-pool pool-usage)"""
@@ -301,23 +296,6 @@ async def route_background_service_status():
         }
     except Exception as e:
         logger.error(f"Erro ao verificar status do serviço: {e}")
-        return {"success": False, "error": str(e)}
-
-@app.post("/api/clear_interfaces_cache")
-async def route_clear_interfaces_cache():
-    """API: Limpar cache de interfaces descobertas para forçar nova descoberta"""
-    try:
-        cache = get_cache()
-        for slot in range(10):
-            cache.remove(f"discover_interfaces_slot{slot}")
-        logger.info("Cache de interfaces limpo — próxima descoberta será em tempo real")
-        return {
-            "success": True,
-            "message": "Cache de interfaces limpo. Clique em 'Descobrir Interfaces' para atualizar.",
-            "timestamp": datetime.now().isoformat()
-        }
-    except Exception as e:
-        logger.error(f"Erro ao limpar cache de interfaces: {e}")
         return {"success": False, "error": str(e)}
 
 @app.post("/api/force_cache_refresh")

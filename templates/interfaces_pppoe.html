@@ -3,352 +3,520 @@
 {% block page_title %}Interfaces PPPoE — Monitoramento por Interface Física{% endblock %}
 {% block content %}
 
-<!-- Descoberta automática de interfaces -->
+<!-- =====================================================================
+     SEÇÃO 1 — INTERFACES CADASTRADAS
+     ===================================================================== -->
 <div class="card p-5 mb-5">
     <div class="flex items-center justify-between mb-4">
         <div>
-            <h3 class="section-title">Interfaces Físicas Descobertas</h3>
-            <p class="text-xs text-slate-400 mt-0.5">Clique em "Descobrir Interfaces" para listar automaticamente todas as interfaces GE do roteador com a contagem de usuários PPPoE.</p>
+            <h3 class="section-title">Interfaces Cadastradas</h3>
+            <p class="text-xs text-slate-400 mt-0.5">Adicione as interfaces físicas do NE8000. Para cada interface você pode adicionar VLANs e fazer o scan individualmente.</p>
         </div>
-        <div class="flex items-center gap-2">
+        <button onclick="openAddInterface()" class="btn-primary">
+            <i class="fas fa-plus"></i> Adicionar Interface
+        </button>
+    </div>
+
+    <!-- Lista de interfaces cadastradas -->
+    <div id="ifaceList">
+        <div id="ifaceEmpty" class="text-center py-10 text-slate-400">
+            <i class="fas fa-ethernet text-4xl mb-3 block opacity-40"></i>
+            <div class="font-medium">Nenhuma interface cadastrada</div>
+            <div class="text-xs mt-1">Clique em "Adicionar Interface" para começar</div>
+        </div>
+        <div id="ifaceCards" class="space-y-4"></div>
+    </div>
+</div>
+
+<!-- =====================================================================
+     SEÇÃO 2 — RESULTADO DO SCAN
+     ===================================================================== -->
+<div id="scanResultSection" class="hidden card mb-5">
+    <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+        <div>
+            <span class="section-title" id="scanResultTitle">Resultado do Scan</span>
+            <span class="text-xs text-slate-400 ml-2 font-mono" id="scanResultCmd"></span>
+        </div>
+        <button onclick="closeScanResult()" class="text-slate-400 hover:text-slate-600 transition">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+
+    <!-- Contagem -->
+    <div id="scanCountBlock" class="hidden p-5">
+        <div class="flex items-center gap-4">
+            <div class="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center flex-shrink-0">
+                <i class="fas fa-users text-blue-600 text-2xl"></i>
+            </div>
             <div>
-                <label class="text-xs text-slate-500 font-semibold uppercase tracking-wide mr-1">Slot</label>
-                <input type="number" id="discoverSlot" value="0" min="0" max="9"
-                       class="input-field w-16 text-center text-sm inline-block">
+                <div class="text-4xl font-extrabold text-slate-800" id="scanCountNumber">—</div>
+                <div class="text-sm text-slate-500 mt-0.5" id="scanCountLabel">usuários PPPoE</div>
             </div>
-            <button onclick="discoverInterfaces()" class="btn-primary" id="discoverBtn">
-                <i class="fas fa-radar"></i> Descobrir Interfaces
-            </button>
-            <button onclick="clearInterfacesCache()" class="btn-secondary" id="clearCacheBtn" title="Limpar cache e forçar nova descoberta do roteador">
-                <i class="fas fa-sync-alt"></i> Forçar Atualização
-            </button>
         </div>
     </div>
-    <!-- Aviso de cache -->
-    <div class="text-xs text-slate-400 mb-3">
-        <i class="fas fa-clock mr-1"></i> As interfaces são armazenadas em cache por <strong>1 hora</strong> para evitar sobrecarga no roteador. Use “Forçar Atualização” para buscar novamente.
-    </div>
 
-    <!-- Loading descoberta -->
-    <div id="discoverLoading" class="hidden text-center py-6">
-        <i class="fas fa-spinner fa-spin text-blue-500 text-2xl mb-2"></i>
-        <div class="text-sm font-semibold text-slate-600 mb-1">Consultando roteador...</div>
-        <div class="text-xs text-slate-400">O comando pode levar 30-60 segundos no NE8000.</div>
-        <div class="text-xs text-amber-500 mt-1"><i class="fas fa-info-circle mr-1"></i>O servidor continua respondendo normalmente durante a consulta.</div>
-    </div>
-
-    <!-- Tabela de interfaces descobertas -->
-    <div id="discoverResult" class="hidden">
-        <div class="flex items-center justify-between mb-3">
-            <div class="flex items-center gap-4">
-                <div class="text-center">
-                    <div class="text-2xl font-extrabold text-slate-800" id="discoverTotalIfaces">0</div>
-                    <div class="text-xs text-slate-400">Interfaces</div>
-                </div>
-                <div class="text-center">
-                    <div class="text-2xl font-extrabold text-blue-600" id="discoverTotalUsers">0</div>
-                    <div class="text-xs text-slate-400">Usuários PPPoE</div>
-                </div>
-            </div>
-            <span class="text-xs text-slate-400" id="discoverTimestamp"></span>
+    <!-- Tabela de usuários -->
+    <div id="scanUsersBlock" class="hidden">
+        <div class="px-4 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Usuários encontrados</span>
+            <span class="text-xs text-slate-400" id="scanUsersCount"></span>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
                 <thead class="bg-slate-50 border-b border-slate-100">
                     <tr>
-                        <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Interface</th>
-                        <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status Físico</th>
-                        <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status Protocolo</th>
-                        <th class="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Usuários PPPoE</th>
-                        <th class="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Ações</th>
+                        <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide w-10">#</th>
+                        <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Dados do Usuário</th>
                     </tr>
                 </thead>
-                <tbody id="discoverTableBody" class="divide-y divide-slate-50"></tbody>
+                <tbody id="scanUsersBody" class="divide-y divide-slate-50"></tbody>
             </table>
         </div>
     </div>
 
-    <div id="discoverEmpty" class="hidden text-center py-8 text-slate-400">
-        <i class="fas fa-ethernet text-3xl mb-2 block"></i>
-        Nenhuma interface GE encontrada. Verifique a conexão SSH.
-    </div>
-</div>
-
-<!-- Consulta manual por interface -->
-<div class="card p-5 mb-5">
-    <h3 class="section-title mb-4">Consulta Manual por Interface / VLAN</h3>
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
-        <div>
-            <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Slot</label>
-            <input type="number" id="slotInput" value="0" min="0" max="9"
-                   class="input-field" placeholder="0">
-        </div>
-        <div class="md:col-span-2">
-            <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Interface (ex: GE0/1/0)</label>
-            <input type="text" id="ifaceInput" value="GE0/1/0"
-                   class="input-field" placeholder="GE0/1/0">
-        </div>
-        <div>
-            <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">VLAN (0 = todas)</label>
-            <input type="number" id="vlanInput" value="0" min="0" max="4094"
-                   class="input-field" placeholder="0">
-        </div>
-    </div>
-    <div class="flex gap-3 mt-4">
-        <button onclick="queryCount()" class="btn-primary">
-            <i class="fas fa-calculator"></i> Contar Usuários
-        </button>
-        <button onclick="queryUsers()" class="btn-secondary">
-            <i class="fas fa-list"></i> Listar Usuários
-        </button>
-    </div>
-    <div class="mt-3 text-xs text-slate-400 font-mono">
-        <i class="fas fa-terminal mr-1"></i>
-        <span id="cmdPreview">display access-user slot 0 | include GE0/1/0 | exclude PPPoE | count</span>
-    </div>
-</div>
-
-<!-- Count result -->
-<div id="countResult" class="hidden card p-5 mb-4">
-    <div class="flex items-center gap-4">
-        <div class="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
-            <i class="fas fa-users text-blue-600 text-xl"></i>
-        </div>
-        <div>
-            <div class="text-3xl font-extrabold text-slate-800" id="countNumber">—</div>
-            <div class="text-sm text-slate-500" id="countLabel">usuários encontrados</div>
-            <div class="text-xs text-slate-400 font-mono mt-0.5" id="countCmd">—</div>
-        </div>
-    </div>
-</div>
-
-<!-- Users table -->
-<div id="usersResult" class="hidden card">
-    <div class="p-4 border-b border-slate-100 flex items-center justify-between">
-        <span class="section-title">Usuários na Interface</span>
-        <span class="text-sm text-slate-500" id="usersCount">—</span>
-    </div>
-    <div class="overflow-x-auto">
-        <table class="w-full text-sm">
-            <thead class="bg-slate-50 border-b border-slate-100">
-                <tr>
-                    <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide w-10">#</th>
-                    <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Dados do Usuário</th>
-                </tr>
-            </thead>
-            <tbody id="usersTableBody" class="divide-y divide-slate-50"></tbody>
-        </table>
-    </div>
+    <!-- Raw output -->
     <div class="border-t border-slate-100">
-        <button onclick="toggleRawIface()" class="w-full flex items-center justify-between p-4 text-sm font-semibold text-slate-600 hover:text-slate-800 transition">
+        <button onclick="toggleScanRaw()" class="w-full flex items-center justify-between p-4 text-sm font-semibold text-slate-600 hover:text-slate-800 transition">
             <span><i class="fas fa-terminal mr-2 text-slate-400"></i>Output Raw do Roteador</span>
-            <i class="fas fa-chevron-down text-slate-400" id="rawIfaceChevron"></i>
+            <i class="fas fa-chevron-down text-slate-400" id="scanRawChevron"></i>
         </button>
-        <div id="rawIfaceOutput" class="hidden border-t border-slate-100">
-            <pre class="bg-slate-900 text-green-400 p-4 text-xs overflow-x-auto font-mono leading-relaxed rounded-b-xl" id="rawIfacePre"></pre>
+        <div id="scanRawBlock" class="hidden border-t border-slate-100">
+            <pre class="bg-slate-900 text-green-400 p-4 text-xs overflow-x-auto font-mono leading-relaxed rounded-b-xl" id="scanRawPre"></pre>
         </div>
     </div>
 </div>
 
-<!-- Loading manual -->
-<div id="ifaceLoading" class="hidden card p-8 text-center">
+<!-- Loading global -->
+<div id="globalLoading" class="hidden card p-8 text-center mb-5">
     <i class="fas fa-spinner fa-spin text-blue-500 text-2xl mb-3"></i>
-    <div class="text-slate-600 font-medium">Consultando roteador...</div>
+    <div class="text-slate-600 font-medium" id="globalLoadingMsg">Consultando roteador...</div>
+    <div class="text-xs text-slate-400 mt-1">Aguarde — o NE8000 pode levar alguns segundos para responder.</div>
+</div>
+
+<!-- =====================================================================
+     MODAL — Adicionar Interface
+     ===================================================================== -->
+<div id="modalAddInterface" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
+        <div class="flex items-center justify-between mb-5">
+            <h3 class="text-base font-bold text-slate-800"><i class="fas fa-ethernet mr-2 text-blue-500"></i>Adicionar Interface Física</h3>
+            <button onclick="closeAddInterface()" class="text-slate-400 hover:text-slate-600 transition"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="space-y-4">
+            <div>
+                <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Nome da Interface</label>
+                <input type="text" id="newIfaceName" placeholder="ex: GigabitEthernet0/1/5"
+                       class="input-field" oninput="updateIfacePreview()">
+                <p class="text-xs text-slate-400 mt-1">Use o nome completo: <span class="font-mono">GigabitEthernet0/1/X</span></p>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Slot</label>
+                <input type="number" id="newIfaceSlot" value="0" min="0" max="9" class="input-field w-24">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Descrição (opcional)</label>
+                <input type="text" id="newIfaceDesc" placeholder="ex: Uplink OLT 1"
+                       class="input-field">
+            </div>
+            <div class="bg-slate-50 rounded-lg p-3 font-mono text-xs text-slate-500">
+                <i class="fas fa-terminal mr-1"></i>
+                <span id="ifacePreviewCmd">display access-user slot 0 | include GigabitEthernet0/1/X | exclude PPPoE | count</span>
+            </div>
+        </div>
+        <div class="flex gap-3 mt-6">
+            <button onclick="addInterface()" class="btn-primary flex-1">
+                <i class="fas fa-plus"></i> Adicionar
+            </button>
+            <button onclick="closeAddInterface()" class="btn-secondary flex-1">Cancelar</button>
+        </div>
+    </div>
+</div>
+
+<!-- =====================================================================
+     MODAL — Adicionar VLAN
+     ===================================================================== -->
+<div id="modalAddVlan" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6">
+        <div class="flex items-center justify-between mb-5">
+            <h3 class="text-base font-bold text-slate-800"><i class="fas fa-tag mr-2 text-indigo-500"></i>Adicionar VLAN</h3>
+            <button onclick="closeAddVlan()" class="text-slate-400 hover:text-slate-600 transition"><i class="fas fa-times"></i></button>
+        </div>
+        <input type="hidden" id="vlanTargetIface">
+        <div class="space-y-4">
+            <div>
+                <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Número da VLAN</label>
+                <input type="number" id="newVlanId" placeholder="ex: 1201" min="1" max="4094"
+                       class="input-field" oninput="updateVlanPreview()">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Descrição (opcional)</label>
+                <input type="text" id="newVlanDesc" placeholder="ex: Residencial Bloco A"
+                       class="input-field">
+            </div>
+            <div class="bg-slate-50 rounded-lg p-3 font-mono text-xs text-slate-500">
+                <i class="fas fa-terminal mr-1"></i>
+                <span id="vlanPreviewCmd">—</span>
+            </div>
+        </div>
+        <div class="flex gap-3 mt-6">
+            <button onclick="addVlan()" class="btn-primary flex-1">
+                <i class="fas fa-plus"></i> Adicionar VLAN
+            </button>
+            <button onclick="closeAddVlan()" class="btn-secondary flex-1">Cancelar</button>
+        </div>
+    </div>
 </div>
 
 <script>
-// ── Limpar cache de interfaces ────────────────────────────────────────────
-async function clearInterfacesCache() {
-    const btn = document.getElementById('clearCacheBtn');
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Limpando...';
-    try {
-        const r = await fetch('/api/clear_interfaces_cache', {method: 'POST'});
-        const d = await r.json();
-        if (d.success) {
-            showMessage('Cache limpo! Clique em "Descobrir Interfaces" para atualizar.', 'success');
-            // Limpar tabela atual
-            document.getElementById('discoverResult').classList.add('hidden');
-            document.getElementById('discoverEmpty').classList.add('hidden');
-        } else {
-            showMessage('Erro ao limpar cache: ' + d.error, 'error');
-        }
-    } catch(e) {
-        showMessage('Erro: ' + e.message, 'error');
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-sync-alt"></i> Forçar Atualização';
-    }
+// ── Storage ────────────────────────────────────────────────────────────────
+const STORAGE_KEY = 'ne8000_interfaces_v2';
+
+function loadInterfaces() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+    catch { return []; }
 }
 
-// ── Descoberta automática ──────────────────────────────────────────────────
-async function discoverInterfaces() {
-    const slot = parseInt(document.getElementById('discoverSlot').value) || 0;
-    const btn = document.getElementById('discoverBtn');
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Aguarde...';
-    document.getElementById('discoverLoading').classList.remove('hidden');
-    document.getElementById('discoverResult').classList.add('hidden');
-    document.getElementById('discoverEmpty').classList.add('hidden');
-    const startTime = Date.now();
+function saveInterfaces(list) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+}
 
-    try {
-        const r = await fetch(`/api/discover_interfaces?slot=${slot}`);
-        const d = await r.json();
-        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-        document.getElementById('discoverLoading').classList.add('hidden');
+// ── Renderização ───────────────────────────────────────────────────────────
+function renderAll() {
+    const list = loadInterfaces();
+    const empty = document.getElementById('ifaceEmpty');
+    const cards = document.getElementById('ifaceCards');
 
-        if (!d.success) {
-            showMessage('Erro na descoberta: ' + d.error, 'error');
-            return;
-        }
+    if (list.length === 0) {
+        empty.classList.remove('hidden');
+        cards.innerHTML = '';
+        return;
+    }
+    empty.classList.add('hidden');
 
-        if (!d.interfaces || d.interfaces.length === 0) {
-            document.getElementById('discoverEmpty').classList.remove('hidden');
-            return;
-        }
-
-        document.getElementById('discoverTotalIfaces').textContent = d.total_interfaces;
-        document.getElementById('discoverTotalUsers').textContent = d.total_users;
-        const cacheInfo = d.from_cache === false ? ` (${elapsed}s)` : ' ✔ cache';
-        document.getElementById('discoverTimestamp').textContent = 'Atualizado: ' + new Date().toLocaleTimeString('pt-BR') + cacheInfo;
-
-        const tbody = document.getElementById('discoverTableBody');
-        tbody.innerHTML = d.interfaces.map(iface => {
-            const phyColor = iface.phy_status === 'up' ? 'text-green-600' : (iface.phy_status === 'down' ? 'text-red-600' : 'text-slate-400');
-            const protoColor = iface.proto_status === 'up' ? 'text-green-600' : (iface.proto_status === 'down' ? 'text-red-600' : 'text-slate-400');
-            const countColor = iface.pppoe_count > 0 ? 'text-blue-700 font-bold' : 'text-slate-400';
-            return `<tr class="hover:bg-slate-50 transition-colors">
-                <td class="px-4 py-2.5">
-                    <span class="font-mono font-semibold text-slate-800 text-sm">${iface.name}</span>
-                    ${iface.full_name !== iface.name ? `<div class="text-xs text-slate-400 font-mono">${iface.full_name}</div>` : ''}
-                </td>
-                <td class="px-4 py-2.5">
-                    <span class="inline-flex items-center gap-1 text-xs font-semibold ${phyColor}">
-                        <i class="fas fa-circle text-xs"></i>${iface.phy_status}
-                    </span>
-                </td>
-                <td class="px-4 py-2.5">
-                    <span class="inline-flex items-center gap-1 text-xs font-semibold ${protoColor}">
-                        <i class="fas fa-circle text-xs"></i>${iface.proto_status}
-                    </span>
-                </td>
-                <td class="px-4 py-2.5 text-right">
-                    <span class="text-lg ${countColor}">${iface.pppoe_count}</span>
-                </td>
-                <td class="px-4 py-2.5 text-center">
-                    <button onclick="useInterface('${iface.name}')"
-                            class="btn-secondary text-xs py-1 px-3">
-                        <i class="fas fa-search"></i> Consultar
+    cards.innerHTML = list.map((iface, idx) => `
+        <div class="border border-slate-200 rounded-xl overflow-hidden">
+            <!-- Cabeçalho da interface -->
+            <div class="bg-slate-50 px-4 py-3 flex items-center justify-between border-b border-slate-200">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-ethernet text-blue-600 text-sm"></i>
+                    </div>
+                    <div>
+                        <div class="font-mono font-bold text-slate-800 text-sm">${iface.name}</div>
+                        ${iface.desc ? `<div class="text-xs text-slate-400">${iface.desc}</div>` : ''}
+                    </div>
+                    <span class="text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-mono">slot ${iface.slot}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="scanInterface(${idx})" class="btn-primary text-xs py-1.5 px-3" title="Scan total da interface (sem VLAN)">
+                        <i class="fas fa-search"></i> Scan Total
                     </button>
-                </td>
-            </tr>`;
-        }).join('');
+                    <button onclick="listUsersInterface(${idx})" class="btn-secondary text-xs py-1.5 px-3" title="Listar usuários da interface">
+                        <i class="fas fa-list"></i> Listar
+                    </button>
+                    <button onclick="openAddVlan(${idx})" class="text-xs border border-indigo-200 text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg font-semibold transition" title="Adicionar VLAN">
+                        <i class="fas fa-tag"></i> + VLAN
+                    </button>
+                    <button onclick="removeInterface(${idx})" class="text-xs text-red-400 hover:text-red-600 hover:bg-red-50 px-2 py-1.5 rounded-lg transition" title="Remover interface">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
 
-        document.getElementById('discoverResult').classList.remove('hidden');
+            <!-- VLANs da interface -->
+            <div class="p-3">
+                ${iface.vlans && iface.vlans.length > 0 ? `
+                <div class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 px-1">VLANs</div>
+                <div class="flex flex-wrap gap-2">
+                    ${iface.vlans.map((vlan, vidx) => `
+                        <div class="flex items-center gap-1 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-1.5">
+                            <span class="font-mono font-bold text-indigo-700 text-sm">.${vlan.id}</span>
+                            ${vlan.desc ? `<span class="text-xs text-indigo-400 ml-1">${vlan.desc}</span>` : ''}
+                            <div class="flex items-center gap-1 ml-2">
+                                <button onclick="scanVlan(${idx}, ${vidx})" class="text-xs text-indigo-600 hover:text-indigo-800 font-semibold transition" title="Contar usuários nesta VLAN">
+                                    <i class="fas fa-calculator"></i>
+                                </button>
+                                <button onclick="listUsersVlan(${idx}, ${vidx})" class="text-xs text-slate-500 hover:text-slate-700 font-semibold transition ml-1" title="Listar usuários desta VLAN">
+                                    <i class="fas fa-list"></i>
+                                </button>
+                                <button onclick="removeVlan(${idx}, ${vidx})" class="text-xs text-red-400 hover:text-red-600 transition ml-1" title="Remover VLAN">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+                ` : `
+                <div class="text-xs text-slate-400 text-center py-3">
+                    <i class="fas fa-tag mr-1 opacity-40"></i>Nenhuma VLAN cadastrada — clique em <strong>+ VLAN</strong> para adicionar
+                </div>
+                `}
+            </div>
+        </div>
+    `).join('');
+}
+
+// ── Modal: Adicionar Interface ─────────────────────────────────────────────
+function openAddInterface() {
+    document.getElementById('newIfaceName').value = '';
+    document.getElementById('newIfaceSlot').value = '0';
+    document.getElementById('newIfaceDesc').value = '';
+    updateIfacePreview();
+    document.getElementById('modalAddInterface').classList.remove('hidden');
+    document.getElementById('newIfaceName').focus();
+}
+
+function closeAddInterface() {
+    document.getElementById('modalAddInterface').classList.add('hidden');
+}
+
+function updateIfacePreview() {
+    const name = document.getElementById('newIfaceName').value.trim() || 'GigabitEthernet0/1/X';
+    const slot = document.getElementById('newIfaceSlot').value || '0';
+    document.getElementById('ifacePreviewCmd').textContent =
+        `display access-user slot ${slot} | include ${name} | exclude PPPoE | count`;
+}
+
+function addInterface() {
+    const name = document.getElementById('newIfaceName').value.trim();
+    const slot = parseInt(document.getElementById('newIfaceSlot').value) || 0;
+    const desc = document.getElementById('newIfaceDesc').value.trim();
+    if (!name) { showMessage('Informe o nome da interface.', 'error'); return; }
+    const list = loadInterfaces();
+    if (list.find(i => i.name === name)) { showMessage('Interface já cadastrada.', 'error'); return; }
+    list.push({ name, slot, desc, vlans: [] });
+    saveInterfaces(list);
+    closeAddInterface();
+    renderAll();
+    showMessage(`Interface ${name} adicionada com sucesso.`, 'success');
+}
+
+function removeInterface(idx) {
+    const list = loadInterfaces();
+    const name = list[idx].name;
+    if (!confirm(`Remover a interface ${name} e todas as suas VLANs?`)) return;
+    list.splice(idx, 1);
+    saveInterfaces(list);
+    renderAll();
+    showMessage(`Interface ${name} removida.`, 'success');
+}
+
+// ── Modal: Adicionar VLAN ──────────────────────────────────────────────────
+let _vlanTargetIdx = null;
+
+function openAddVlan(ifaceIdx) {
+    _vlanTargetIdx = ifaceIdx;
+    document.getElementById('newVlanId').value = '';
+    document.getElementById('newVlanDesc').value = '';
+    document.getElementById('vlanPreviewCmd').textContent = '—';
+    document.getElementById('modalAddVlan').classList.remove('hidden');
+    document.getElementById('newVlanId').focus();
+}
+
+function closeAddVlan() {
+    document.getElementById('modalAddVlan').classList.add('hidden');
+    _vlanTargetIdx = null;
+}
+
+function updateVlanPreview() {
+    if (_vlanTargetIdx === null) return;
+    const list = loadInterfaces();
+    const iface = list[_vlanTargetIdx];
+    const vlanId = document.getElementById('newVlanId').value.trim() || 'XXXX';
+    document.getElementById('vlanPreviewCmd').textContent =
+        `display access-user slot ${iface.slot} | include ${iface.name}.${vlanId} | exclude PPPoE | count`;
+}
+
+function addVlan() {
+    const vlanId = parseInt(document.getElementById('newVlanId').value);
+    const desc = document.getElementById('newVlanDesc').value.trim();
+    if (!vlanId || vlanId < 1 || vlanId > 4094) { showMessage('Informe um número de VLAN válido (1-4094).', 'error'); return; }
+    const list = loadInterfaces();
+    const iface = list[_vlanTargetIdx];
+    if (iface.vlans.find(v => v.id === vlanId)) { showMessage('VLAN já cadastrada nesta interface.', 'error'); return; }
+    iface.vlans.push({ id: vlanId, desc });
+    iface.vlans.sort((a, b) => a.id - b.id);
+    saveInterfaces(list);
+    closeAddVlan();
+    renderAll();
+    showMessage(`VLAN ${vlanId} adicionada à interface ${iface.name}.`, 'success');
+}
+
+function removeVlan(ifaceIdx, vlanIdx) {
+    const list = loadInterfaces();
+    const iface = list[ifaceIdx];
+    const vlan = iface.vlans[vlanIdx];
+    iface.vlans.splice(vlanIdx, 1);
+    saveInterfaces(list);
+    renderAll();
+    showMessage(`VLAN ${vlan.id} removida.`, 'success');
+}
+
+// ── Scan ───────────────────────────────────────────────────────────────────
+function showLoading(msg) {
+    document.getElementById('globalLoadingMsg').textContent = msg || 'Consultando roteador...';
+    document.getElementById('globalLoading').classList.remove('hidden');
+    document.getElementById('scanResultSection').classList.add('hidden');
+}
+
+function hideLoading() {
+    document.getElementById('globalLoading').classList.add('hidden');
+}
+
+function closeScanResult() {
+    document.getElementById('scanResultSection').classList.add('hidden');
+}
+
+function toggleScanRaw() {
+    const block = document.getElementById('scanRawBlock');
+    const chevron = document.getElementById('scanRawChevron');
+    block.classList.toggle('hidden');
+    chevron.classList.toggle('fa-chevron-down');
+    chevron.classList.toggle('fa-chevron-up');
+}
+
+async function scanInterface(idx) {
+    const list = loadInterfaces();
+    const iface = list[idx];
+    const cmd = `display access-user slot ${iface.slot} | include ${iface.name} | exclude PPPoE | count`;
+    showLoading(`Contando usuários em ${iface.name}...`);
+    try {
+        const params = new URLSearchParams({ slot: iface.slot, interface: iface.name, vlan: 0 });
+        const r = await fetch(`/api/pppoe_interfaces_real?${params}`);
+        const d = await r.json();
+        hideLoading();
+        showCountResult(iface.name, d, cmd);
     } catch(e) {
-        document.getElementById('discoverLoading').classList.add('hidden');
+        hideLoading();
         showMessage('Erro de conexão: ' + e.message, 'error');
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-radar"></i> Descobrir Interfaces';
     }
 }
 
-function useInterface(name) {
-    document.getElementById('ifaceInput').value = name;
-    document.getElementById('vlanInput').value = '0';
-    updateCmdPreview();
-    document.getElementById('ifaceInput').scrollIntoView({behavior: 'smooth', block: 'center'});
-    document.getElementById('ifaceInput').focus();
+async function listUsersInterface(idx) {
+    const list = loadInterfaces();
+    const iface = list[idx];
+    const cmd = `display access-user slot ${iface.slot} | include ${iface.name} | exclude PPPoE`;
+    showLoading(`Listando usuários em ${iface.name}...`);
+    try {
+        const params = new URLSearchParams({ slot: iface.slot, interface: iface.name });
+        const r = await fetch(`/api/pppoe_users_by_interface?${params}`);
+        const d = await r.json();
+        hideLoading();
+        showUsersResult(iface.name, d, cmd);
+    } catch(e) {
+        hideLoading();
+        showMessage('Erro de conexão: ' + e.message, 'error');
+    }
 }
 
-// ── Consulta manual ────────────────────────────────────────────────────────
-function getParams() {
-    return {
-        slot: parseInt(document.getElementById('slotInput').value) || 0,
-        iface: document.getElementById('ifaceInput').value.trim() || 'GE0/1/0',
-        vlan: parseInt(document.getElementById('vlanInput').value) || 0
-    };
+async function scanVlan(ifaceIdx, vlanIdx) {
+    const list = loadInterfaces();
+    const iface = list[ifaceIdx];
+    const vlan = iface.vlans[vlanIdx];
+    const ifaceName = `${iface.name}.${vlan.id}`;
+    const cmd = `display access-user slot ${iface.slot} | include ${ifaceName} | exclude PPPoE | count`;
+    showLoading(`Contando usuários na VLAN ${vlan.id} (${iface.name})...`);
+    try {
+        const params = new URLSearchParams({ slot: iface.slot, interface: iface.name, vlan: vlan.id });
+        const r = await fetch(`/api/pppoe_interfaces_real?${params}`);
+        const d = await r.json();
+        hideLoading();
+        showCountResult(ifaceName, d, cmd);
+    } catch(e) {
+        hideLoading();
+        showMessage('Erro de conexão: ' + e.message, 'error');
+    }
 }
 
-function updateCmdPreview() {
-    const {slot, iface, vlan} = getParams();
-    let cmd = vlan > 0
-        ? `display access-user slot ${slot} | include ${iface}.${vlan} | exclude PPPoE | count`
-        : `display access-user slot ${slot} | include ${iface} | exclude PPPoE | count`;
-    document.getElementById('cmdPreview').textContent = cmd;
+async function listUsersVlan(ifaceIdx, vlanIdx) {
+    const list = loadInterfaces();
+    const iface = list[ifaceIdx];
+    const vlan = iface.vlans[vlanIdx];
+    const ifaceName = `${iface.name}.${vlan.id}`;
+    const cmd = `display access-user slot ${iface.slot} | include ${ifaceName} | exclude PPPoE`;
+    showLoading(`Listando usuários na VLAN ${vlan.id} (${iface.name})...`);
+    try {
+        const params = new URLSearchParams({ slot: iface.slot, interface: ifaceName });
+        const r = await fetch(`/api/pppoe_users_by_interface?${params}`);
+        const d = await r.json();
+        hideLoading();
+        showUsersResult(ifaceName, d, cmd);
+    } catch(e) {
+        hideLoading();
+        showMessage('Erro de conexão: ' + e.message, 'error');
+    }
 }
 
-['slotInput','ifaceInput','vlanInput'].forEach(id => {
-    document.getElementById(id).addEventListener('input', updateCmdPreview);
+// ── Exibição de resultados ─────────────────────────────────────────────────
+function showCountResult(label, d, cmd) {
+    document.getElementById('scanResultTitle').textContent = `Scan — ${label}`;
+    document.getElementById('scanResultCmd').textContent = cmd;
+    document.getElementById('scanCountBlock').classList.remove('hidden');
+    document.getElementById('scanUsersBlock').classList.add('hidden');
+
+    if (d.success) {
+        document.getElementById('scanCountNumber').textContent = d.total_users ?? d.count ?? 0;
+        document.getElementById('scanCountLabel').textContent = `usuários PPPoE em ${label}`;
+    } else {
+        document.getElementById('scanCountNumber').textContent = '—';
+        document.getElementById('scanCountLabel').textContent = 'Erro: ' + (d.error || 'desconhecido');
+    }
+
+    document.getElementById('scanRawPre').textContent = d.raw_output || '(sem output)';
+    document.getElementById('scanRawBlock').classList.add('hidden');
+    document.getElementById('scanRawChevron').className = 'fas fa-chevron-down text-slate-400';
+    document.getElementById('scanResultSection').classList.remove('hidden');
+    document.getElementById('scanResultSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function showUsersResult(label, d, cmd) {
+    document.getElementById('scanResultTitle').textContent = `Usuários — ${label}`;
+    document.getElementById('scanResultCmd').textContent = cmd;
+    document.getElementById('scanCountBlock').classList.add('hidden');
+    document.getElementById('scanUsersBlock').classList.remove('hidden');
+
+    const users = d.users || [];
+    document.getElementById('scanUsersCount').textContent = `${users.length} usuário(s)`;
+
+    if (users.length === 0) {
+        document.getElementById('scanUsersBody').innerHTML = `
+            <tr><td colspan="2" class="text-center py-8 text-slate-400">
+                <i class="fas fa-user-slash text-2xl mb-2 block opacity-40"></i>
+                Nenhum usuário encontrado
+            </td></tr>`;
+    } else {
+        document.getElementById('scanUsersBody').innerHTML = users.map((u, i) => `
+            <tr class="hover:bg-slate-50 transition-colors">
+                <td class="px-4 py-3 text-slate-400 text-xs">${i + 1}</td>
+                <td class="px-4 py-3">
+                    <div class="font-mono text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">${escapeHtml(u)}</div>
+                </td>
+            </tr>`).join('');
+    }
+
+    document.getElementById('scanRawPre').textContent = d.raw_output || '(sem output)';
+    document.getElementById('scanRawBlock').classList.add('hidden');
+    document.getElementById('scanRawChevron').className = 'fas fa-chevron-down text-slate-400';
+    document.getElementById('scanResultSection').classList.remove('hidden');
+    document.getElementById('scanResultSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function escapeHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+// ── Fechar modais com ESC ──────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+        closeAddInterface();
+        closeAddVlan();
+    }
 });
 
-function showLoading(show) {
-    document.getElementById('ifaceLoading').classList.toggle('hidden', !show);
-}
-
-async function queryCount() {
-    const {slot, iface, vlan} = getParams();
-    showLoading(true);
-    document.getElementById('countResult').classList.add('hidden');
-    try {
-        const url = `/api/pppoe_interfaces_real?slot=${slot}&interface=${encodeURIComponent(iface)}&vlan=${vlan}`;
-        const r = await fetch(url);
-        const d = await r.json();
-        showLoading(false);
-        if (d.success) {
-            document.getElementById('countResult').classList.remove('hidden');
-            document.getElementById('countNumber').textContent = d.count;
-            document.getElementById('countLabel').textContent = `usuário(s) na interface ${iface}${vlan>0?'.'+vlan:''}`;
-            document.getElementById('countCmd').textContent = d.command;
-        } else {
-            showMessage('Erro: ' + d.error, 'error');
-        }
-    } catch(e) {
-        showLoading(false);
-        showMessage('Erro de conexão: ' + e.message, 'error');
-    }
-}
-
-async function queryUsers() {
-    const {slot, iface} = getParams();
-    showLoading(true);
-    document.getElementById('usersResult').classList.add('hidden');
-    try {
-        const url = `/api/pppoe_users_by_interface?slot=${slot}&interface=${encodeURIComponent(iface)}`;
-        const r = await fetch(url);
-        const d = await r.json();
-        showLoading(false);
-        if (d.success) {
-            document.getElementById('usersResult').classList.remove('hidden');
-            document.getElementById('usersCount').textContent = d.count + ' usuário(s)';
-            document.getElementById('rawIfacePre').textContent = d.raw_output || '';
-            const tbody = document.getElementById('usersTableBody');
-            if (d.users && d.users.length > 0) {
-                tbody.innerHTML = d.users.map((u, i) =>
-                    `<tr class="hover:bg-slate-50"><td class="px-4 py-2.5 text-slate-400 text-xs">${i+1}</td><td class="px-4 py-2.5 font-mono text-xs text-slate-700">${u.raw}</td></tr>`
-                ).join('');
-            } else {
-                tbody.innerHTML = '<tr><td colspan="2" class="px-4 py-6 text-center text-slate-400">Nenhum usuário encontrado</td></tr>';
-            }
-        } else {
-            showMessage('Erro: ' + d.error, 'error');
-        }
-    } catch(e) {
-        showLoading(false);
-        showMessage('Erro de conexão: ' + e.message, 'error');
-    }
-}
-
-function toggleRawIface() {
-    const raw = document.getElementById('rawIfaceOutput');
-    const chev = document.getElementById('rawIfaceChevron');
-    raw.classList.toggle('hidden');
-    chev.className = raw.classList.contains('hidden') ? 'fas fa-chevron-down text-slate-400' : 'fas fa-chevron-up text-slate-400';
-}
-
-// Descobrir interfaces automaticamente ao carregar a página
-discoverInterfaces();
+// ── Init ───────────────────────────────────────────────────────────────────
+renderAll();
 </script>
 {% endblock %}
