@@ -133,34 +133,52 @@
 </div>
 
 <!-- =====================================================================
-     MODAL — Adicionar VLAN
+     MODAL — Adicionar VLAN (suporta múltiplas VLANs e intervalos)
      ===================================================================== -->
 <div id="modalAddVlan" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-6">
         <div class="flex items-center justify-between mb-5">
-            <h3 class="text-base font-bold text-slate-800"><i class="fas fa-tag mr-2 text-indigo-500"></i>Adicionar VLAN</h3>
+            <div>
+                <h3 class="text-base font-bold text-slate-800"><i class="fas fa-tags mr-2 text-indigo-500"></i>Adicionar VLANs</h3>
+                <p class="text-xs text-slate-400 mt-0.5" id="vlanModalSubtitle">Interface: —</p>
+            </div>
             <button onclick="closeAddVlan()" class="text-slate-400 hover:text-slate-600 transition"><i class="fas fa-times"></i></button>
         </div>
         <input type="hidden" id="vlanTargetIface">
         <div class="space-y-4">
+            <!-- Campo de entrada de VLANs -->
             <div>
-                <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Número da VLAN</label>
-                <input type="number" id="newVlanId" placeholder="ex: 1201" min="1" max="4094"
-                       class="input-field" oninput="updateVlanPreview()">
+                <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">VLANs</label>
+                <input type="text" id="newVlanId"
+                       placeholder="ex: 1201, 1202, 1203 ou 1200-1210"
+                       class="input-field font-mono"
+                       oninput="updateVlanPreview()">
+                <div class="flex flex-wrap gap-2 mt-2 text-xs text-slate-400">
+                    <span class="bg-slate-100 rounded px-2 py-0.5 font-mono">1201</span>
+                    <span class="text-slate-300">— uma VLAN</span>
+                    <span class="bg-slate-100 rounded px-2 py-0.5 font-mono ml-2">1201, 1202, 1205</span>
+                    <span class="text-slate-300">— lista</span>
+                    <span class="bg-slate-100 rounded px-2 py-0.5 font-mono ml-2">1200-1210</span>
+                    <span class="text-slate-300">— intervalo</span>
+                </div>
             </div>
-            <div>
-                <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Descrição (opcional)</label>
-                <input type="text" id="newVlanDesc" placeholder="ex: Residencial Bloco A"
-                       class="input-field">
+
+            <!-- Preview das VLANs a serem adicionadas -->
+            <div id="vlanPreviewBlock" class="hidden">
+                <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">VLANs a adicionar</label>
+                <div id="vlanPreviewTags" class="flex flex-wrap gap-1.5 p-3 bg-indigo-50 border border-indigo-100 rounded-lg min-h-[40px]"></div>
+                <div class="text-xs text-slate-400 mt-1.5" id="vlanPreviewCount"></div>
             </div>
-            <div class="bg-slate-50 rounded-lg p-3 font-mono text-xs text-slate-500">
-                <i class="fas fa-terminal mr-1"></i>
-                <span id="vlanPreviewCmd">—</span>
+
+            <!-- Aviso de VLANs já existentes -->
+            <div id="vlanDuplicateWarn" class="hidden bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-700">
+                <i class="fas fa-exclamation-triangle mr-1"></i>
+                <span id="vlanDuplicateMsg"></span>
             </div>
         </div>
         <div class="flex gap-3 mt-6">
-            <button onclick="addVlan()" class="btn-primary flex-1">
-                <i class="fas fa-plus"></i> Adicionar VLAN
+            <button onclick="addVlan()" id="btnAddVlan" class="btn-primary flex-1" disabled>
+                <i class="fas fa-plus"></i> <span id="btnAddVlanLabel">Adicionar</span>
             </button>
             <button onclick="closeAddVlan()" class="btn-secondary flex-1">Cancelar</button>
         </div>
@@ -308,14 +326,46 @@ function removeInterface(idx) {
     showMessage(`Interface ${name} removida.`, 'success');
 }
 
-// ── Modal: Adicionar VLAN ──────────────────────────────────────────────────
+// ── Modal: Adicionar VLAN (múltiplas / intervalos) ────────────────────────
 let _vlanTargetIdx = null;
+
+function parseVlanInput(raw) {
+    /**
+     * Converte a entrada do usuário em um array de IDs de VLAN únicos e ordenados.
+     * Suporta:
+     *   - Número único:  "1201"
+     *   - Lista:          "1201, 1202, 1205"
+     *   - Intervalo:      "1200-1210"
+     *   - Misto:          "1100, 1200-1205, 1300"
+     */
+    const ids = new Set();
+    const parts = raw.split(',').map(s => s.trim()).filter(Boolean);
+    for (const part of parts) {
+        if (part.includes('-')) {
+            const [a, b] = part.split('-').map(s => parseInt(s.trim()));
+            if (!isNaN(a) && !isNaN(b) && a <= b && a >= 1 && b <= 4094) {
+                for (let i = a; i <= b; i++) ids.add(i);
+            }
+        } else {
+            const n = parseInt(part);
+            if (!isNaN(n) && n >= 1 && n <= 4094) ids.add(n);
+        }
+    }
+    return [...ids].sort((a, b) => a - b);
+}
 
 function openAddVlan(ifaceIdx) {
     _vlanTargetIdx = ifaceIdx;
     document.getElementById('newVlanId').value = '';
-    document.getElementById('newVlanDesc').value = '';
-    document.getElementById('vlanPreviewCmd').textContent = '—';
+    document.getElementById('vlanPreviewBlock').classList.add('hidden');
+    document.getElementById('vlanPreviewTags').innerHTML = '';
+    document.getElementById('vlanPreviewCount').textContent = '';
+    document.getElementById('vlanDuplicateWarn').classList.add('hidden');
+    document.getElementById('btnAddVlan').disabled = true;
+    document.getElementById('btnAddVlanLabel').textContent = 'Adicionar';
+    const list = loadInterfaces();
+    const iface = list[ifaceIdx];
+    document.getElementById('vlanModalSubtitle').textContent = `Interface: ${iface.name} (slot ${iface.slot})`;
     document.getElementById('modalAddVlan').classList.remove('hidden');
     document.getElementById('newVlanId').focus();
 }
@@ -327,27 +377,89 @@ function closeAddVlan() {
 
 function updateVlanPreview() {
     if (_vlanTargetIdx === null) return;
+    const raw = document.getElementById('newVlanId').value.trim();
+    const ids = parseVlanInput(raw);
+    const previewBlock = document.getElementById('vlanPreviewBlock');
+    const tagsEl = document.getElementById('vlanPreviewTags');
+    const countEl = document.getElementById('vlanPreviewCount');
+    const warnEl = document.getElementById('vlanDuplicateWarn');
+    const btn = document.getElementById('btnAddVlan');
+    const btnLabel = document.getElementById('btnAddVlanLabel');
+
+    if (ids.length === 0) {
+        previewBlock.classList.add('hidden');
+        warnEl.classList.add('hidden');
+        btn.disabled = true;
+        btnLabel.textContent = 'Adicionar';
+        return;
+    }
+
     const list = loadInterfaces();
     const iface = list[_vlanTargetIdx];
-    const vlanId = document.getElementById('newVlanId').value.trim() || 'XXXX';
-    // iface.name já está no formato abreviado (GE0/1/X)
-    document.getElementById('vlanPreviewCmd').textContent =
-        `display access-user slot ${iface.slot} | include ${iface.name}.${vlanId} | exclude PPPoE | count`;
+    const existing = new Set(iface.vlans.map(v => v.id));
+    const novas = ids.filter(id => !existing.has(id));
+    const duplicadas = ids.filter(id => existing.has(id));
+
+    // Renderizar tags
+    previewBlock.classList.remove('hidden');
+    tagsEl.innerHTML = ids.map(id => {
+        const isDup = existing.has(id);
+        return `<span class="text-xs font-mono px-2 py-0.5 rounded-full border ${
+            isDup
+            ? 'bg-amber-100 border-amber-300 text-amber-700 line-through'
+            : 'bg-indigo-100 border-indigo-200 text-indigo-700'
+        }">${id}</span>`;
+    }).join('');
+
+    countEl.textContent = novas.length > 0
+        ? `${novas.length} VLAN(s) serão adicionadas${duplicadas.length > 0 ? ` (${duplicadas.length} já existem e serão ignoradas)` : ''}`
+        : '';
+
+    // Aviso de duplicatas
+    if (duplicadas.length > 0 && novas.length === 0) {
+        warnEl.classList.remove('hidden');
+        document.getElementById('vlanDuplicateMsg').textContent =
+            `Todas as VLANs informadas já estão cadastradas nesta interface.`;
+        btn.disabled = true;
+        btnLabel.textContent = 'Adicionar';
+    } else if (duplicadas.length > 0) {
+        warnEl.classList.remove('hidden');
+        document.getElementById('vlanDuplicateMsg').textContent =
+            `VLANs já existentes (riscadas) serão ignoradas: ${duplicadas.join(', ')}`;
+        btn.disabled = false;
+        btnLabel.textContent = `Adicionar ${novas.length} VLAN(s)`;
+    } else {
+        warnEl.classList.add('hidden');
+        btn.disabled = false;
+        btnLabel.textContent = `Adicionar ${novas.length} VLAN(s)`;
+    }
 }
 
 function addVlan() {
-    const vlanId = parseInt(document.getElementById('newVlanId').value);
-    const desc = document.getElementById('newVlanDesc').value.trim();
-    if (!vlanId || vlanId < 1 || vlanId > 4094) { showMessage('Informe um número de VLAN válido (1-4094).', 'error'); return; }
+    if (_vlanTargetIdx === null) return;
+    const raw = document.getElementById('newVlanId').value.trim();
+    const ids = parseVlanInput(raw);
+    if (ids.length === 0) { showMessage('Informe ao menos uma VLAN válida (1-4094).', 'error'); return; }
+
     const list = loadInterfaces();
     const iface = list[_vlanTargetIdx];
-    if (iface.vlans.find(v => v.id === vlanId)) { showMessage('VLAN já cadastrada nesta interface.', 'error'); return; }
-    iface.vlans.push({ id: vlanId, desc });
+    const existing = new Set(iface.vlans.map(v => v.id));
+    const novas = ids.filter(id => !existing.has(id));
+
+    if (novas.length === 0) { showMessage('Todas as VLANs informadas já estão cadastradas.', 'error'); return; }
+
+    novas.forEach(id => iface.vlans.push({ id, desc: '' }));
     iface.vlans.sort((a, b) => a.id - b.id);
     saveInterfaces(list);
     closeAddVlan();
     renderAll();
-    showMessage(`VLAN ${vlanId} adicionada à interface ${iface.name}.`, 'success');
+    showMessage(
+        novas.length === 1
+            ? `VLAN ${novas[0]} adicionada à interface ${iface.name}.`
+            : `${novas.length} VLANs adicionadas à interface ${iface.name}: ${novas.join(', ')}.`,
+        'success'
+    );
+});
 }
 
 function removeVlan(ifaceIdx, vlanIdx) {
